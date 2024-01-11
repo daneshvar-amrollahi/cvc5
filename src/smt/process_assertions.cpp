@@ -336,6 +336,8 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
     applyPass("bv-eager-atoms", ap);
   }
 
+  applyPass("daneshvar", ap);
+
   Trace("smt-proc") << "ProcessAssertions::apply() end" << endl;
   dumpAssertions("assertions::post-everything", ap);
   Trace("assertions::post-everything") << std::endl;
