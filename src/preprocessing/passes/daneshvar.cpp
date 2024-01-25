@@ -19,6 +19,8 @@
 #include "theory/rewriter.h"
 #include "theory/strings/theory_strings_preprocess.h"
 
+#include <map>
+
 using namespace cvc5::internal::theory;
 
 namespace cvc5::internal {
@@ -28,49 +30,60 @@ namespace passes {
 Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
     : PreprocessingPass(preprocContext, "daneshvar"){};
 
-void dfs(Node n)
+
+
+unsigned getDAGSize(Node n, std::map<Node, bool>& visited)
 {
-    std::cout << "Node: " << n << "   ";
+    visited[n] = true;
     if (n.isVar() || n.isConst())
     {
-        std::cout << "reached a leaf" << std::endl;
-        return;
+        return 1;
     }
-    std::cout << std::endl;
+    unsigned size = 1;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        dfs(n[i]);
+        if (visited.find(n[i]) == visited.end())
+        {
+            size += getDAGSize(n[i], visited);
+        }
     }
+    return size;
 }
 
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
-    std::cout << "Executing pass daneshvar" << std::endl;
+    // std::cout << "Executing pass daneshvar" << std::endl;
 
     const std::vector<Node>& assertions = assertionsToPreprocess->ref();
-
+    std::vector<std::pair<Node, unsigned>> nodes;
+    std::map<Node, bool> visited;
     for (const Node& assertion : assertions)
     {
-        std::cout << "Assertion: " << assertion << std::endl;
-        std::cout << "Calling dfs" << std::endl;
-        dfs(assertion);
-        std::cout << "*************" << std::endl;
-        // std::cout << "Node kind: " << assertion.getKind() << std::endl;
-        // std::cout << "Node type: " << assertion.getType() << std::endl;
-        // std::cout << "Node num children: " << assertion.getNumChildren() << std::endl;
-        // Node c0 = assertion[0];
-        // Node c1 = assertion[1];
-        // Node c2 = assertion[2];
-        // std::cout << "Node 0: " << c0 << std::endl;
-        // std::cout << "Node 1: " << c1 << std::endl;
-        // std::cout << "Node 2: " << c2 << std::endl;
-        // Node c20 = c2[0];
-        // Node c21 = c2[1];
-        // std::cout << "Node 20: " << c20 << " " << c20.getKind() << std::endl;
-        // std::cout << "Node 21: " << c21 << " " << c21.getKind() << std::endl;
-
+        visited.clear();
+        unsigned size = getDAGSize(assertion, visited);
+        nodes.push_back(std::make_pair(assertion, size));
     }
+
+    sort(nodes.begin(), nodes.end(), [](const std::pair<Node, unsigned>& a, const std::pair<Node, unsigned>& b) {
+        return a.second < b.second;
+    });
+
+    for (unsigned i = 0; i < assertionsToPreprocess->size(); ++i)
+    {
+        assertionsToPreprocess->replace(i, nodes[i].first);
+    }
+    
+
+
+    // std::cout << "Assertions after sorting: " << std::endl;
+    // for (const auto& node : assertionsToPreprocess->ref())
+    // {
+    //     std::cout << node << std::endl;
+    // }
+
+    // std::cout << "Finished pass daneshvar" << std::endl;
+
 
   return PreprocessingPassResult::NO_CONFLICT;
 }
