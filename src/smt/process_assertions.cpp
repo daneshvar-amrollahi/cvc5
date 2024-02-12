@@ -113,6 +113,8 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
     return true;
   }
 
+  applyPass("daneshvar", ap);
+
   if (options().bv.bvGaussElim)
   {
     applyPass("bv-gauss", ap);
@@ -346,8 +348,6 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
   {
     applyPass("bv-eager-atoms", ap);
   }
-
-  applyPass("daneshvar", ap);
 
   Trace("smt-proc") << "ProcessAssertions::apply() end" << endl;
   dumpAssertions("assertions::post-everything", ap);
