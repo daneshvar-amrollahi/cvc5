@@ -21,7 +21,6 @@
 #include "proof/alethe/alethe_node_converter.h"
 #include "proof/alethe/alethe_post_processor.h"
 #include "proof/alethe/alethe_printer.h"
-#include "proof/alf/alf_post_processor.h"
 #include "proof/alf/alf_printer.h"
 #include "proof/dot/dot_printer.h"
 #include "proof/lfsc/lfsc_post_processor.h"
@@ -42,16 +41,25 @@ namespace smt {
 
 PfManager::PfManager(Env& env)
     : EnvObj(env),
-      d_rewriteDb(new rewriter::RewriteDb),
-      d_pchecker(
-          new ProofChecker(statisticsRegistry(),
-                           options().proof.proofCheck,
-                           static_cast<uint32_t>(options().proof.proofPedantic),
-                           d_rewriteDb.get())),
-      d_pnm(new ProofNodeManager(
-          env.getOptions(), env.getRewriter(), d_pchecker.get())),
+      d_rewriteDb(nullptr),
+      d_pchecker(nullptr),
+      d_pnm(nullptr),
       d_pfpp(nullptr)
 {
+  // construct the rewrite db only if DSL rewrites are enabled
+  if (options().proof.proofGranularityMode
+      == options::ProofGranularityMode::DSL_REWRITE)
+  {
+    d_rewriteDb.reset(new rewriter::RewriteDb);
+  }
+  // enable the proof checker and the proof node manager
+  d_pchecker.reset(
+      new ProofChecker(statisticsRegistry(),
+                       options().proof.proofCheck,
+                       static_cast<uint32_t>(options().proof.proofPedantic),
+                       d_rewriteDb.get()));
+  d_pnm.reset(new ProofNodeManager(
+      env.getOptions(), env.getRewriter(), d_pchecker.get()));
   // Now, initialize the proof postprocessor with the environment.
   // By default the post-processor will update all assumptions, which
   // can lead to SCOPE subproofs of the form
@@ -235,8 +243,11 @@ void PfManager::printProof(std::ostream& out,
   Trace("smt-proof") << "PfManager::printProof: start" << std::endl;
   // We don't want to invalidate the proof nodes in fp, since these may be
   // reused in further check-sat calls, or they may be used again if the
-  // user asks for the proof again (in non-incremental mode).
-  if (mode != options::ProofFormatMode::NONE)
+  // user asks for the proof again (in non-incremental mode). We don't need to
+  // clone if the printing below does not modify the proof, which is the case
+  // for proof formats ALF and NONE.
+  if (mode != options::ProofFormatMode::ALF
+      && mode != options::ProofFormatMode::NONE)
   {
     fp = fp->clone();
   }
