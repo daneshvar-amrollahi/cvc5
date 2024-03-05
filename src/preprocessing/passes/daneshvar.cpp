@@ -24,7 +24,7 @@
 #include "util/string.h"
 
 #include <map>
-#include <queue>
+#include <stack>
 
 using namespace cvc5::internal::theory;
 
@@ -77,7 +77,7 @@ vertex getVertex(Node n)
 {
     std::string encoding = "";
     std::map<Node, bool> visited;
-    std::vector<std::string> varNames; // ToDo: change to string
+    std::vector<std::string> varNames; // ToDo: change type to std::string?
     dfs(n, encoding, visited, varNames);
     encoding += "\n";
     return vertex(n, encoding, varNames);
@@ -101,14 +101,14 @@ bool cmp(const vertex& a, const vertex& b)
     return a.encoding < b.encoding;
 }
 
-Node renameVariables(Node n, unsigned int &counter, std::map<Node, unsigned int> &varMap, NodeManager* nodeManager)
+Node renameVariables(Node n, unsigned int &counter, std::map<std::string, unsigned int> &varMap, NodeManager* nodeManager)
 {
     if (n.isVar())
     {
         std::string varname = n.toString();
-        if (varMap.find(n) == varMap.end())
+        if (varMap.find(varname) == varMap.end())
         {
-            varMap[n] = counter++;
+            varMap[varname] = counter++;
             // std::cout << "Variable " << varname << " is renamed to " << "v" + std::to_string(varMap[n]) << std::endl;
         }
 
@@ -127,7 +127,7 @@ Node renameVariables(Node n, unsigned int &counter, std::map<Node, unsigned int>
 
         // Approach 3 (Non Fresh Variables): Crashing
         std::vector<Node> cnodes;
-        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(varMap[n]), false)));
+        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(varMap[varname]), false)));
         // Since we index only on Node, we must construct a SortToTerm here.
         Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
         cnodes.push_back(gt);
@@ -153,6 +153,69 @@ Node renameVariables(Node n, unsigned int &counter, std::map<Node, unsigned int>
 }
 
 
+std::pair<std::string, std::string> getFirstDiffVars(const std::vector<std::string> &a, const std::vector<std::string> &b)
+{
+    int n = std::min(a.size(), b.size());
+    for (int i = 0; i < n; i++)
+    {
+        if (a[i] != b[i])
+        {
+            return std::make_pair(a[i], b[i]);
+        }
+    }
+    return std::make_pair("", ""); // ToDo: Add assertion failed
+}
+
+const int maxN = 1e5 + 10; // Maximum number of variable names
+std::vector<int> adj[maxN];
+
+void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
+{
+    mark[v] = true;
+    for (int u : adj[v])
+    {
+        if (!mark[u])
+        {
+            topolsort(u, mark, st);
+        }
+    }
+    st.push(v);
+}
+
+
+Node rebuild(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
+{
+    if (n.isVar())
+    {
+        std::string varname = n.toString();
+        int v = varMap[varname];
+        int newv = normVar[v];
+        
+        std::vector<Node> cnodes;
+        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
+        Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
+        cnodes.push_back(gt);
+        return nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
+    }
+    if (n.isConst())
+    {
+        return n;
+    }
+    std::vector<Node> children;
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        children.push_back(rebuild(n[i], normVar, varMap, nodeManager));
+    }
+
+    if (n.hasOperator())
+    {
+        Node op = n.getOperator();
+        return nodeManager->mkNode(op, children);
+    }
+
+    return nodeManager->mkNode(n.getKind(), children);
+}
+
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
@@ -166,29 +229,129 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     sort(nodes.begin(), nodes.end(), cmp);
 
-    // std::cout << "Assertions after daneshvar pass" << std::endl;
-    unsigned int id = 1; // counter for renaming variables
-    std::map<Node, unsigned int> varMap; // map from variable to its new name
-    NodeManager* nodeManager = NodeManager::currentNM();
-    for (size_t i = 0; i < nodes.size(); i++)
-    {
-        // std::cout << nodes[i].node << std::endl;
-        // std::cout << nodes[i].encoding << std::endl;
+    
 
-        // std::cout << "Before renaming: " << std::endl << nodes[i].node << std::endl;
-        Node renamed = renameVariables(nodes[i].node, id, varMap, nodeManager);
-        // std::cout << "After renaming: " << std::endl << renamed << std::endl;
-        // std::cout << "--------------" << std::endl;
-        // std::cout << renamed << std::endl;
-        assertionsToPreprocess->replace(i, renamed);
-        // std::cout << "--------------" << std::endl;
-    }
-
+    
+    // //No variable normalization 
     // for (size_t i = 0; i < assertionsToPreprocess->size(); ++i)
     // {
     //     assertionsToPreprocess->replace(i, nodes[i].node);
     // }
     
+
+   
+
+    // /*
+    // Variable normalization 1.0
+    // unsigned int id = 1; // counter for renaming variables
+    // std::map<Node, unsigned int> varMap; // map from variable to its new name
+    // NodeManager* nodeManager = NodeManager::currentNM();
+    // for (size_t i = 0; i < nodes.size(); i++)
+    // {
+    //     // std::cout << nodes[i].node << std::endl;
+    //     // std::cout << nodes[i].encoding << std::endl;
+    //     // std::cout << "Before renaming: " << std::endl << nodes[i].node << std::endl;
+    //     Node renamed = renameVariables(nodes[i].node, id, varMap, nodeManager);
+    //     // std::cout << "After renaming: " << std::endl << renamed << std::endl;
+    //     // std::cout << "--------------" << std::endl;
+    //     assertionsToPreprocess->replace(i, renamed);
+    // }
+    // */
+    
+    
+    // /*
+    // Variable normalization 2.0
+    // */
+    
+    // Map variables to integers
+    std::map<std::string, unsigned> varMap;
+    unsigned id = 1;
+    for (size_t i = 0; i < nodes.size(); i++)
+    {
+        for (size_t j = 0; j < nodes[i].varNames.size(); j++)
+        {
+            if (varMap.find(nodes[i].varNames[j]) == varMap.end())
+            {
+                varMap[nodes[i].varNames[j]] = id++;
+                // std::cout << "Mapped " << nodes[i].varNames[j] << " to " << varMap[nodes[i].varNames[j]] << std::endl;
+            }
+        }
+    }
+    
+    // std::cout << std::endl;
+
+    // Construct dependency graph
+    for (size_t i = 0; i < nodes.size(); i++)
+    {
+        for (size_t j = 0; j < i; j++)
+        {
+            if (nodes[i].encoding == nodes[j].encoding)
+            {
+                std::pair<std::string, std::string> diffVars = getFirstDiffVars(nodes[j].varNames, nodes[i].varNames);
+                std::string var_j = diffVars.first;
+                std::string var_i = diffVars.second;
+                int vj = varMap[var_j], vi = varMap[var_i];
+                // std::cout << "Edge " << vj << " -> " << vi << std::endl;
+                adj[vj].push_back(vi);
+            }
+        }
+    }
+
+    // Topological sort
+    std::stack<int> st;
+    std::vector<bool> mark(id + 1, false);
+    for (size_t i = 1; i < id; i++)
+    {
+        if (!mark[i])
+        {
+            topolsort(i, mark, st);
+        }
+    }
+
+    // Assign new names (v_counter) to variables based on topological order
+    // std::cout << std::endl << "Topological order: " << std::endl;
+    std::map<int, int> normVar;
+    unsigned counter = 1;
+    while (!st.empty())
+    {
+        int v = st.top();
+        st.pop();
+        normVar[v] = counter++;
+        // std::cout << "Assigned " << v << " to v" << normVar[v] << std::endl;
+    }
+
+
+    // Rebuild the assertions
+    NodeManager* nodeManager = NodeManager::currentNM();
+    // Co-pilot's suggestion. Using the RewriteRule instead of the SkolemManager?
+    // for (size_t i = 0; i < nodes.size(); i++)
+    // {
+    //     Node renamed = nodes[i].node;
+    //     for (size_t j = 0; j < nodes[i].varNames.size(); j++)
+    //     {
+    //         std::string varname = nodes[i].varNames[j];
+    //         int v = varMap[varname];
+    //         int newv = normVar[v];
+    //         std::string newvarname = "v" + std::to_string(newv);
+    //         Node oldvar = nodeManager->mkConst(String(varname, false));
+    //         Node newvar = nodeManager->mkConst(String(newvarname, false));
+    //         renamed = theory::Rewriter::rewrite(renamed.substitute(oldvar, newvar));
+    //     }
+    //     assertionsToPreprocess->replace(i, renamed);
+    // }
+
+    // std::cout << std::endl << " --------------- " << std::endl;
+    for (size_t i = 0; i < nodes.size(); i++)
+    {
+        // std::cout << "Before renaming: " << std::endl << nodes[i].node << std::endl;
+        Node renamed = rebuild(nodes[i].node, normVar, varMap, nodeManager);
+        // std::cout << "After renaming: " << std::endl << renamed << std::endl;
+        // std::cout << "--------------" << std::endl;
+        assertionsToPreprocess->replace(i, renamed);
+    }
+
+    
+
   return PreprocessingPassResult::NO_CONFLICT;
 }
 
