@@ -84,7 +84,7 @@ vertex getVertex(Node n)
 }
 
 
-bool cmp(const vertex& a, const vertex& b)
+bool assertionsCmp(const vertex& a, const vertex& b)
 {
     if (a.encoding == b.encoding)
     {
@@ -101,57 +101,30 @@ bool cmp(const vertex& a, const vertex& b)
     return a.encoding < b.encoding;
 }
 
-Node renameVariables(Node n, unsigned int &counter, std::map<std::string, unsigned int> &varMap, NodeManager* nodeManager)
+bool operandsCmp(const Node& a, const Node& b)
 {
-    if (n.isVar())
+    std::string sa, sb;
+    if (a.isVar() || a.isConst())
     {
-        std::string varname = n.toString();
-        if (varMap.find(varname) == varMap.end())
-        {
-            varMap[varname] = counter++;
-            // std::cout << "Variable " << varname << " is renamed to " << "v" + std::to_string(varMap[n]) << std::endl;
-        }
-
-        // Approach 1 (Fresh Variables): Crashing + not allowed
-        // return NodeManager::currentNM()->mkVar("v" + std::to_string(varMap[n]), n.getType());
-
-        // Approach 2 (Fresh variables): sat instead of unsat
-        // Node node = NodeBuilder(nodeManager , Kind::VARIABLE);
-        // nodeManager->setAttribute(node, cvc5::internal::expr::TypeAttr(), n.getType());
-        // nodeManager->setAttribute(node, cvc5::internal::expr::TypeCheckedAttr(), true);
-        // nodeManager->setAttribute(node, expr::VarNameAttr(), "v" + std::to_string(varMap[n]));
-        // return node;
-
-
-        // Node pnode = nodeManager->getSkolemManager()->mkPurifySkolem(n);
-
-        // Approach 3 (Non Fresh Variables): Crashing
-        std::vector<Node> cnodes;
-        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(varMap[varname]), false)));
-        // Since we index only on Node, we must construct a SortToTerm here.
-        Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
-        cnodes.push_back(gt);
-        return nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
+        sa = a.toString();
     }
-    if (n.isConst())
+    else
     {
-        return n;
-    }
-    std::vector<Node> children;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        children.push_back(renameVariables(n[i], counter, varMap, nodeManager));
+        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
+        sa = cvc5::internal::kind::toString(k);
     }
 
-    if (n.hasOperator())
+    if (b.isVar() || b.isConst())
     {
-        Node op = n.getOperator();
-        return nodeManager->mkNode(op, children);
+        sb = b.toString();
     }
-
-    return nodeManager->mkNode(n.getKind(), children);
+    else
+    {
+        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
+        sb = cvc5::internal::kind::toString(k);
+    }
+    return sa < sb;
 }
-
 
 std::pair<std::string, std::string> getFirstDiffVars(const std::vector<std::string> &a, const std::vector<std::string> &b)
 {
@@ -183,7 +156,7 @@ void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
 }
 
 
-Node rebuild(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
+Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
 {
     if (n.isVar())
     {
@@ -204,7 +177,7 @@ Node rebuild(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned
     std::vector<Node> children;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        children.push_back(rebuild(n[i], normVar, varMap, nodeManager));
+        children.push_back(normalize(n[i], normVar, varMap, nodeManager));
     }
 
     if (n.hasOperator())
@@ -214,6 +187,80 @@ Node rebuild(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned
     }
 
     return nodeManager->mkNode(n.getKind(), children);
+}
+
+// Return vector index >= 0 (from where the list of children is commutative)
+// if true, else -1.
+int isCommutative(cvc5::internal::Kind k)
+{
+    if (k == cvc5::internal::Kind::ADD) // ToDo: Other than arithmetic?
+        return 0;
+    if (k == cvc5::internal::Kind::MULT) // ToDo: Other than arithmetic?
+        return 0;
+    if (k == cvc5::internal::Kind::AND)
+        return 0;
+    if (k == cvc5::internal::Kind::OR)
+        return 0;
+    if (k == cvc5::internal::Kind::XOR)
+        return 0;
+    if (k == cvc5::internal::Kind::DISTINCT)
+        return 0;
+    if (k == cvc5::internal::Kind::EQUAL) // ToDo: How about difference logic
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_AND)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_OR)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_XOR)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_NAND)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_NOR)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_COMP)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_ADD)
+        return 0;
+    if (k == cvc5::internal::Kind::BITVECTOR_MULT)
+        return 0;
+    if (k == cvc5::internal::Kind::FLOATINGPOINT_EQ)
+        return 0;
+    if (k == cvc5::internal::Kind::FLOATINGPOINT_ADD)
+        return 1;
+    if (k == cvc5::internal::Kind::FLOATINGPOINT_MULT)
+        return 1;
+    return -1;
+}
+
+Node reorder(Node n)
+{
+    // Sort the operands of each operator using the variable names
+    if (n.isVar() || n.isConst())
+    {
+        return n;
+    }
+    std::vector<Node> operands;
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        operands.push_back(reorder(n[i]));
+    } 
+    int commutative = isCommutative(n.getKind());
+
+
+    if (commutative == 0)
+    {
+        std::sort(operands.begin(), operands.end(), operandsCmp);
+
+    } else if (commutative == 1)
+    {
+        std::sort(operands.begin() + 1, operands.end(), operandsCmp);
+    }
+
+    if (n.hasOperator())
+    {
+        return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
+    }
+    return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
 
 PreprocessingPassResult Daneshvar::applyInternal(
@@ -227,42 +274,12 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodes.push_back(getVertex(assertion));
     }
 
-    sort(nodes.begin(), nodes.end(), cmp);
+    sort(nodes.begin(), nodes.end(), assertionsCmp);
 
-    
 
-    
-    // //No variable normalization 
-    // for (size_t i = 0; i < assertionsToPreprocess->size(); ++i)
-    // {
-    //     assertionsToPreprocess->replace(i, nodes[i].node);
-    // }
-    
+        
+    // VARIABLE NORMALIZATION
 
-   
-
-    // /*
-    // Variable normalization 1.0
-    // unsigned int id = 1; // counter for renaming variables
-    // std::map<Node, unsigned int> varMap; // map from variable to its new name
-    // NodeManager* nodeManager = NodeManager::currentNM();
-    // for (size_t i = 0; i < nodes.size(); i++)
-    // {
-    //     // std::cout << nodes[i].node << std::endl;
-    //     // std::cout << nodes[i].encoding << std::endl;
-    //     // std::cout << "Before renaming: " << std::endl << nodes[i].node << std::endl;
-    //     Node renamed = renameVariables(nodes[i].node, id, varMap, nodeManager);
-    //     // std::cout << "After renaming: " << std::endl << renamed << std::endl;
-    //     // std::cout << "--------------" << std::endl;
-    //     assertionsToPreprocess->replace(i, renamed);
-    // }
-    // */
-    
-    
-    // /*
-    // Variable normalization 2.0
-    // */
-    
     // Map variables to integers
     std::map<std::string, unsigned> varMap;
     unsigned id = 1;
@@ -309,7 +326,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
     // Assign new names (v_counter) to variables based on topological order
-    // std::cout << std::endl << "Topological order: " << std::endl;
     std::map<int, int> normVar;
     unsigned counter = 1;
     while (!st.empty())
@@ -317,38 +333,23 @@ PreprocessingPassResult Daneshvar::applyInternal(
         int v = st.top();
         st.pop();
         normVar[v] = counter++;
-        // std::cout << "Assigned " << v << " to v" << normVar[v] << std::endl;
     }
 
 
     // Rebuild the assertions
     NodeManager* nodeManager = NodeManager::currentNM();
-    // Co-pilot's suggestion. Using the RewriteRule instead of the SkolemManager?
-    // for (size_t i = 0; i < nodes.size(); i++)
-    // {
-    //     Node renamed = nodes[i].node;
-    //     for (size_t j = 0; j < nodes[i].varNames.size(); j++)
-    //     {
-    //         std::string varname = nodes[i].varNames[j];
-    //         int v = varMap[varname];
-    //         int newv = normVar[v];
-    //         std::string newvarname = "v" + std::to_string(newv);
-    //         Node oldvar = nodeManager->mkConst(String(varname, false));
-    //         Node newvar = nodeManager->mkConst(String(newvarname, false));
-    //         renamed = theory::Rewriter::rewrite(renamed.substitute(oldvar, newvar));
-    //     }
-    //     assertionsToPreprocess->replace(i, renamed);
-    // }
-
-    // std::cout << std::endl << " --------------- " << std::endl;
     for (size_t i = 0; i < nodes.size(); i++)
     {
-        // std::cout << "Before renaming: " << std::endl << nodes[i].node << std::endl;
-        Node renamed = rebuild(nodes[i].node, normVar, varMap, nodeManager);
-        // std::cout << "After renaming: " << std::endl << renamed << std::endl;
-        // std::cout << "--------------" << std::endl;
+        std::cout << "Node " << i << " " << nodes[i].node << std::endl;
+        Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);      // normalize symbol names
+        std::cout << "Renamed " << renamed << std::endl;
+        Node reordered = reorder(renamed);                                          // sort the operands of each commutative operator using the variable names
+        std::cout << "Reordered " << reordered << std::endl;
+        std::cout << "---------------------------------" << std::endl;
         assertionsToPreprocess->replace(i, renamed);
     }
+
+
 
     
 
