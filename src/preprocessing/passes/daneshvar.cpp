@@ -263,6 +263,57 @@ Node reorder(Node n)
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
 
+Node fixflips(Node n)
+{
+    if (n.isVar() || n.isConst())
+    {
+        return n;
+    }
+    if (n.getKind() == cvc5::internal::Kind::GT)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::LT, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::GEQ)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::LEQ, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::BITVECTOR_UGT)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::BITVECTOR_ULT, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::BITVECTOR_UGE)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::BITVECTOR_ULE, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::BITVECTOR_SGT)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::BITVECTOR_SLT, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::BITVECTOR_SGE)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::BITVECTOR_SLE, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::FLOATINGPOINT_GT)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::FLOATINGPOINT_LT, n[1], n[0]);
+    }
+    if (n.getKind() == cvc5::internal::Kind::FLOATINGPOINT_GEQ)
+    {
+        return NodeManager::currentNM()->mkNode(cvc5::internal::Kind::FLOATINGPOINT_LEQ, n[1], n[0]);
+    }
+
+    std::vector<Node> operands;
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        operands.push_back(fixflips(n[i]));
+    }
+    if (n.hasOperator())
+    {
+        return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
+    }
+    return NodeManager::currentNM()->mkNode(n.getKind(), operands);
+}
+
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
@@ -340,12 +391,14 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (size_t i = 0; i < nodes.size(); i++)
     {
-        std::cout << "Node " << i << " " << nodes[i].node << std::endl;
-        Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);      // normalize symbol names
-        std::cout << "Renamed " << renamed << std::endl;
-        Node reordered = reorder(renamed);                                          // sort the operands of each commutative operator using the variable names
-        std::cout << "Reordered " << reordered << std::endl;
-        std::cout << "---------------------------------" << std::endl;
+        // std::cout << "Node " << i << " " << nodes[i].node << std::endl;
+        Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
+        // std::cout << "Renamed " << renamed << std::endl;
+        Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
+        // std::cout << "Reordered " << reordered << std::endl;
+        Node flipped = fixflips(reordered);                                             // fix the flips
+        // std::cout << "Flipped " << flipped << std::endl;
+        // std::cout << "---------------------------------" << std::endl;
         assertionsToPreprocess->replace(i, renamed);
     }
 
