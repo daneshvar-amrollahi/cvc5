@@ -399,7 +399,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node flipped = fixflips(reordered);                                             // fix the flips
         // std::cout << "Flipped " << flipped << std::endl;
         // std::cout << "---------------------------------" << std::endl;
-        assertionsToPreprocess->replace(i, renamed);
+        assertionsToPreprocess->replace(i, flipped);
     }
 
 
