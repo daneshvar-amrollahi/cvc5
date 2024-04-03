@@ -22,6 +22,7 @@
 #include "expr/node_manager_attributes.h"
 #include "expr/sort_to_term.h"
 #include "util/string.h"
+#include "expr/node_converter.h"
 
 #include <map>
 #include <stack>
@@ -158,6 +159,9 @@ void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
 
 Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
 {
+    std::cout << "Normalizing " << n << std::endl;
+    NodeConverter nc = NodeConverter(false); // or false?
+    n = nc.convert(n);
     if (n.isVar())
     {
         std::string varname = n.toString();
@@ -168,10 +172,15 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
         cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
         Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
         cnodes.push_back(gt);
-        return nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
+        auto ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes); 
+        std::cout << "isVar returning " << ret << std::endl;
+        std::cout << "---------" << std::endl;
+        return ret;
     }
     if (n.isConst())
     {
+        std::cout << "isConst returning " << n << std::endl;
+        std::cout << "---------" << std::endl;
         return n;
     }
     std::vector<Node> children;
@@ -182,11 +191,28 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
 
     if (n.hasOperator())
     {
-        Node op = n.getOperator();
-        return nodeManager->mkNode(op, children);
-    }
 
-    return nodeManager->mkNode(n.getKind(), children);
+        n = nc.convert(n);
+
+        std::cout << 1 << std::endl;
+        std::cout << "Children of " << n << " are: " << std::endl;
+        for (size_t i = 0; i < children.size(); i++)
+        {
+            std::cout << children[i] << std::endl;
+        }
+        std::cout << "Kind of n " << n.getKind() << std::endl;
+        Node op = n.getOperator();
+        std::cout << "Operator of " << n << " is: " << op << std::endl;
+        auto ret = nodeManager->mkNode(op, children);
+        ret = nc.convert(ret);
+        std::cout << "Returning " << ret << std::endl;
+        std::cout << "---------" << std::endl;
+        return ret;
+    }
+    auto ret = nodeManager->mkNode(n.getKind(), children);
+    std::cout << "no operator returning " << ret << std::endl;
+    std::cout << "---------" << std::endl;
+    return ret;
 }
 
 // Return vector index >= 0 (from where the list of children is commutative)
@@ -256,10 +282,15 @@ Node reorder(Node n)
         std::sort(operands.begin() + 1, operands.end(), operandsCmp);
     }
 
+    // std::cout << "Calling n.hasOperator() " << std::endl << n << " " << n.getNumChildren() << std::endl;
     if (n.hasOperator())
     {
+        // std::cout << 1 << std::endl;
+        // std::cout << "-------------" << std::endl;
         return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
     }
+    // std::cout << 0 << std::endl;
+    // std::cout << "-------------" << std::endl;
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
 
@@ -392,7 +423,9 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (size_t i = 0; i < nodes.size(); i++)
     {
         // std::cout << "Node " << i << " " << nodes[i].node << std::endl;
+        std::cout << "Node before normalization " << nodes[i].node << std::endl;
         Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
+        std::cout << "Node after normalization " << renamed << std::endl;
         // std::cout << "Renamed " << renamed << std::endl;
         Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
         // std::cout << "Reordered " << reordered << std::endl;
