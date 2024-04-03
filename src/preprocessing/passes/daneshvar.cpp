@@ -28,6 +28,8 @@
 #include <stack>
 
 using namespace cvc5::internal::theory;
+using namespace cvc5::internal::kind;
+
 
 namespace cvc5::internal {
 namespace preprocessing {
@@ -160,8 +162,6 @@ void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
 Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
 {
     std::cout << "Normalizing " << n << std::endl;
-    NodeConverter nc = NodeConverter(false); // or false?
-    n = nc.convert(n);
     if (n.isVar())
     {
         std::string varname = n.toString();
@@ -184,33 +184,33 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
         return n;
     }
     std::vector<Node> children;
+
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
+    {
+        children.push_back(n.getOperator());
+    }
+
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         children.push_back(normalize(n[i], normVar, varMap, nodeManager));
     }
 
-    if (n.hasOperator())
+        // if (ret.getMetaKind() == metakind::PARAMETERIZED)
+
+
+    
+    std::cout << "Children of " << n << " are: " << std::endl;
+    for (size_t i = 0; i < children.size(); i++)
     {
-
-        n = nc.convert(n);
-
-        std::cout << 1 << std::endl;
-        std::cout << "Children of " << n << " are: " << std::endl;
-        for (size_t i = 0; i < children.size(); i++)
-        {
-            std::cout << children[i] << std::endl;
-        }
-        std::cout << "Kind of n " << n.getKind() << std::endl;
-        Node op = n.getOperator();
-        std::cout << "Operator of " << n << " is: " << op << std::endl;
-        auto ret = nodeManager->mkNode(op, children);
-        ret = nc.convert(ret);
-        std::cout << "Returning " << ret << std::endl;
-        std::cout << "---------" << std::endl;
-        return ret;
+        std::cout << children[i] << std::endl;
     }
+    std::cout << "Kind of n " << n.getKind() << std::endl;
+    // Node op = n.getOperator();
+    // std::cout << "Operator of " << n << " is: " << op << std::endl;
+    // auto ret = nodeManager->mkNode(op, children);
+
     auto ret = nodeManager->mkNode(n.getKind(), children);
-    std::cout << "no operator returning " << ret << std::endl;
+    std::cout << "returning " << ret << std::endl;
     std::cout << "---------" << std::endl;
     return ret;
 }
@@ -282,13 +282,18 @@ Node reorder(Node n)
         std::sort(operands.begin() + 1, operands.end(), operandsCmp);
     }
 
-    // std::cout << "Calling n.hasOperator() " << std::endl << n << " " << n.getNumChildren() << std::endl;
-    if (n.hasOperator())
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
     {
-        // std::cout << 1 << std::endl;
-        // std::cout << "-------------" << std::endl;
-        return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
+        operands.insert(operands.begin(), n.getOperator());
     }
+
+    // std::cout << "Calling n.hasOperator() " << std::endl << n << " " << n.getNumChildren() << std::endl;
+    // if (n.hasOperator())
+    // {
+    //     // std::cout << 1 << std::endl;
+    //     // std::cout << "-------------" << std::endl;
+    //     return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
+    // }
     // std::cout << 0 << std::endl;
     // std::cout << "-------------" << std::endl;
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
@@ -334,14 +339,20 @@ Node fixflips(Node n)
     }
 
     std::vector<Node> operands;
+
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
+    {
+        operands.push_back(n.getOperator());
+    }
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         operands.push_back(fixflips(n[i]));
     }
-    if (n.hasOperator())
-    {
-        return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
-    }
+
+    // if (n.hasOperator())
+    // {
+    //     return NodeManager::currentNM()->mkNode(n.getOperator(), operands);
+    // }
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
 
