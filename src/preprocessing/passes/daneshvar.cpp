@@ -180,13 +180,23 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
     }
     std::vector<Node> children;
 
+    std::cout << "Kind of " << n << " is " << n.getKind() << std::endl;
+    if (n.hasOperator())
+    {
+        std::cout << "Operator: " << n.getOperator() << std::endl;
+    }
+
     if (n.getMetaKind() == metakind::PARAMETERIZED)
     {
+        std::cout << "PARAMETERIZED" << std::endl;
         children.push_back(n.getOperator());
     }
 
+    
+    std::cout << "Children: " << n.getNumChildren() << std::endl;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
+        std::cout << "Child " << n[i] << std::endl;
         children.push_back(normalize(n[i], normVar, varMap, nodeManager));
     }
     
@@ -399,15 +409,17 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (size_t i = 0; i < nodes.size(); i++)
     {
-        // std::cout << "Node " << i << " " << nodes[i].node << std::endl;
+        std::cout << "Before pass:" << std::endl;
+        std::cout << nodes[i].node << std::endl;
         Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
         // std::cout << "Renamed " << renamed << std::endl;
         Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
         // std::cout << "Reordered " << reordered << std::endl;
         Node flipped = fixflips(reordered);                                             // fix the flips
-        // std::cout << "Flipped " << flipped << std::endl;
+        std::cout << "After pass:" << std::endl;
+        std::cout << flipped << std::endl;
         // std::cout << "---------------------------------" << std::endl;
-        assertionsToPreprocess->replace(i, flipped);
+        assertionsToPreprocess->replace(i, renamed);
     }
 
 
