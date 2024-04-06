@@ -158,8 +158,9 @@ void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
     st.push(v);
 }
 
+std::map<int, Node> var2node;
 
-Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager)
+Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager, bool insideQuantifierBody = false)
 {
     if (n.isVar())
     {
@@ -167,12 +168,36 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
         int v = varMap[varname];
         int newv = normVar[v];
         
+        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
+        {
+            Node ret = nodeManager->mkBoundVar("v" + std::to_string(newv), n.getType());
+            if (var2node.find(newv) == var2node.end())
+            {
+                var2node[newv] = ret;
+                return ret;
+            }
+            else
+            {
+                return var2node[newv];
+            }
+        }
+
         std::vector<Node> cnodes;
         cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
         Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
         cnodes.push_back(gt);
         auto ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes); 
-        return ret;
+
+
+        if (var2node.find(newv) == var2node.end())
+        {
+            var2node[newv] = ret;
+            return ret;
+        }
+        else
+        {
+            return var2node[newv];
+        }
     }
     if (n.isConst())
     {
@@ -180,27 +205,21 @@ Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsign
     }
     std::vector<Node> children;
 
-    std::cout << "Kind of " << n << " is " << n.getKind() << std::endl;
-    if (n.hasOperator())
-    {
-        std::cout << "Operator: " << n.getOperator() << std::endl;
-    }
 
     if (n.getMetaKind() == metakind::PARAMETERIZED)
     {
-        std::cout << "PARAMETERIZED" << std::endl;
+        // std::cout << "PARAMETERIZED" << std::endl;
         children.push_back(n.getOperator());
     }
 
     
-    std::cout << "Children: " << n.getNumChildren() << std::endl;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        std::cout << "Child " << n[i] << std::endl;
         children.push_back(normalize(n[i], normVar, varMap, nodeManager));
     }
     
     auto ret = nodeManager->mkNode(n.getKind(), children);
+
     return ret;
 }
 
@@ -409,21 +428,21 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (size_t i = 0; i < nodes.size(); i++)
     {
-        std::cout << "Before pass:" << std::endl;
-        std::cout << nodes[i].node << std::endl;
+        // std::cout << "Before pass:" << std::endl;
+        // std::cout << nodes[i].node << std::endl;
         Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
         // std::cout << "Renamed " << renamed << std::endl;
         Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
         // std::cout << "Reordered " << reordered << std::endl;
         Node flipped = fixflips(reordered);                                             // fix the flips
-        std::cout << "After pass:" << std::endl;
-        std::cout << flipped << std::endl;
+        // std::cout << "After pass:" << std::endl;
+        // std::cout << flipped << std::endl;
         // std::cout << "---------------------------------" << std::endl;
-        assertionsToPreprocess->replace(i, renamed);
+        assertionsToPreprocess->replace(i, flipped);
     }
 
 
-
+    // exit(0);
     
 
   return PreprocessingPassResult::NO_CONFLICT;
