@@ -23,6 +23,7 @@
 #include "expr/sort_to_term.h"
 #include "util/string.h"
 #include "expr/node_converter.h"
+#include "util/statistics_registry.h"
 
 #include <map>
 #include <stack>
@@ -36,7 +37,9 @@ namespace preprocessing {
 namespace passes {
 
 Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
-    : PreprocessingPass(preprocContext, "daneshvar"){};
+    : PreprocessingPass(preprocContext, "daneshvar"),
+    d_statistics(statisticsRegistry())
+    {};
 
 void dfs(Node n, std::string& encoding, std::map<Node, bool> &visited, std::vector<std::string> &varNames)
 {
@@ -354,6 +357,8 @@ Node fixflips(Node n)
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
+    TimerStat::CodeTimer codeTimer(d_statistics.d_passTime);
+
     const std::vector<Node>& assertions = assertionsToPreprocess->ref();
 
     std::vector <vertex> nodes;
@@ -447,6 +452,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
   return PreprocessingPassResult::NO_CONFLICT;
 }
+
+
+Daneshvar::Statistics::Statistics(StatisticsRegistry& reg)
+    : d_passTime(reg.registerTimer("Daneshvar::pass_time"))
+{
+}
+
+
+
 
 }  // namespace passes
 }  // namespace preprocessing

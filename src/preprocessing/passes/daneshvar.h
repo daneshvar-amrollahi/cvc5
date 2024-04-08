@@ -36,6 +36,16 @@ class Daneshvar : public PreprocessingPass
  protected:
   PreprocessingPassResult applyInternal(
       AssertionPipeline* assertionsToPreprocess) override;
+
+private:
+  struct Statistics
+  {
+    
+    TimerStat d_passTime;
+    Statistics(StatisticsRegistry& reg);
+  };
+
+  Statistics d_statistics;
 };
 
 }  // namespace passes
