@@ -41,9 +41,8 @@ Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
     d_statistics(statisticsRegistry())
     {};
 
-void dfs(Node n, std::string& encoding, std::map<Node, bool> &visited, std::vector<std::string> &varNames)
+void dfs(Node n, std::string& encoding, std::vector<std::string> &varNames)
 {
-    visited[n] = true;
     if (n.isVar())
     {
         std::string varname = n.toString();
@@ -59,50 +58,59 @@ void dfs(Node n, std::string& encoding, std::map<Node, bool> &visited, std::vect
 
     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(n.getKind());
     std::string boz = cvc5::internal::kind::toString(k);
-    // std::cout << "kind of node " << n << std::endl <<  boz << std::endl;
     encoding += boz + ";";
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        if (!visited[n[i]])
-        {
-            dfs(n[i], encoding, visited, varNames);
-        }
+        dfs(n[i], encoding, varNames);
     }
 }
 
 
-struct vertex
+struct NodeInfo
 {
     Node node;
     std::string encoding;
-    std::vector<std::string> varNames;
-    vertex(Node n, std::string e, std::vector<std::string> v) : node(n), encoding(e), varNames(v) {}
+    std::vector<int> varSeq;
+    std::vector<std::string> varNames; 
+    NodeInfo(Node n, std::string e, std::vector<int> vs, std::vector<std::string> vn) : node(n), encoding(e), varSeq(vs), varNames(vn) {}
 };
 
-vertex getVertex(Node n)
+NodeInfo getNodeInfo(Node n)
 {
     std::string encoding = "";
-    std::map<Node, bool> visited;
-    std::vector<std::string> varNames; // ToDo: change type to std::string?
-    dfs(n, encoding, visited, varNames);
+    std::vector<std::string> varNames; 
+    dfs(n, encoding, varNames);
     encoding += "\n";
-    return vertex(n, encoding, varNames);
+
+    std::vector<int> varSeq;
+    std::map<std::string, int> varMap;
+    int id = 1;
+    for (size_t i = 0; i < varNames.size(); ++i)
+    {
+        if (varMap.find(varNames[i]) == varMap.end())
+        {
+            varMap[varNames[i]] = id++;
+        }
+        varSeq.push_back(varMap[varNames[i]]);
+    }
+    return NodeInfo(n, encoding, varSeq, varNames);
 }
 
 
-bool assertionsCmp(const vertex& a, const vertex& b)
+bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
 {
     if (a.encoding == b.encoding)
     {
-        int n = std::min(a.varNames.size(), b.varNames.size());
-        for (int i = 0; i < n; i++)
+        AssertArgument(a.varSeq.size() == b.varSeq.size(), a.toString() + " and " + b.toString() + " have the same encoding but different variable sequence size");
+        size_t n = a.varSeq.size();
+        for (size_t i = 0; i < n; i++)
         {
-            if (a.varNames[i] != b.varNames[i])
+            if (a.varSeq[i] != b.varSeq[i])
             {
-                return a.varNames[i] < b.varNames[i];
+                return a.varSeq[i] < b.varSeq[i];
             }
         }
-        return a.varNames.size() < b.varNames.size();
+        AssertArgument(false, a.node.toString() + " and " + b.node.toString() + " have the same encoding but different nodes");
     }
     return a.encoding < b.encoding;
 }
@@ -163,68 +171,6 @@ void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
 
 std::map<int, Node> var2node;
 
-Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager, bool insideQuantifierBody = false)
-{
-    if (n.isVar())
-    {
-        std::string varname = n.toString();
-        int v = varMap[varname];
-        int newv = normVar[v];
-        
-        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
-        {
-            Node ret = nodeManager->mkBoundVar("v" + std::to_string(newv), n.getType());
-            if (var2node.find(newv) == var2node.end())
-            {
-                var2node[newv] = ret;
-                return ret;
-            }
-            else
-            {
-                return var2node[newv];
-            }
-        }
-
-        std::vector<Node> cnodes;
-        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
-        Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
-        cnodes.push_back(gt);
-        auto ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes); 
-
-
-        if (var2node.find(newv) == var2node.end())
-        {
-            var2node[newv] = ret;
-            return ret;
-        }
-        else
-        {
-            return var2node[newv];
-        }
-    }
-    if (n.isConst())
-    {
-        return n;
-    }
-    std::vector<Node> children;
-
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        // std::cout << "PARAMETERIZED" << std::endl;
-        children.push_back(n.getOperator());
-    }
-
-    
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        children.push_back(normalize(n[i], normVar, varMap, nodeManager));
-    }
-    
-    auto ret = nodeManager->mkNode(n.getKind(), children);
-
-    return ret;
-}
 
 // Return vector index >= 0 (from where the list of children is commutative)
 // if true, else -1.
@@ -354,97 +300,339 @@ Node fixflips(Node n)
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
 
+
+
+
+
+Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager, bool insideQuantifierBody = false)
+{
+    if (n.isVar())
+    {
+        std::string varname = n.toString();
+        int v = varMap[varname];
+        int newv = normVar[v];
+        
+        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
+        {
+            Node ret = nodeManager->mkBoundVar("v" + std::to_string(newv), n.getType());
+            if (var2node.find(newv) == var2node.end())
+            {
+                var2node[newv] = ret;
+                return ret;
+            }
+            else
+            {
+                return var2node[newv];
+            }
+        }
+
+        std::vector<Node> cnodes;
+        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
+        Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
+        cnodes.push_back(gt);
+        auto ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes); 
+
+
+        if (var2node.find(newv) == var2node.end())
+        {
+            var2node[newv] = ret;
+            return ret;
+        }
+        else
+        {
+            return var2node[newv];
+        }
+    }
+    if (n.isConst())
+    {
+        return n;
+    }
+    std::vector<Node> children;
+
+
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
+    {
+        // std::cout << "PARAMETERIZED" << std::endl;
+        children.push_back(n.getOperator());
+    }
+
+    
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        children.push_back(normalize(n[i], normVar, varMap, nodeManager));
+    }
+    
+    auto ret = nodeManager->mkNode(n.getKind(), children);
+
+    return ret;
+}
+
+
+
+
+
+Node rename(
+    Node n, 
+    std::map<std::string, Node> &freeVar2node, 
+    std::map<std::string, Node> &boundVar2node, 
+    NodeManager* nodeManager, 
+    bool insideQuantifierBody = false)
+{
+    // std::cout << "Renaming " << n << std::endl;
+    if (n.isConst())
+    {
+        return n;
+    }
+    if (n.isVar())
+    {
+        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
+        {
+            if (boundVar2node.find(n.toString()) != boundVar2node.end())
+            {
+                return boundVar2node[n.toString()];
+            }
+            else
+            {
+                int id = boundVar2node.size() + 1;
+                Node ret = nodeManager->mkBoundVar("v" + std::to_string(id), n.getType());
+                boundVar2node[n.toString()] = ret;
+                return ret;
+            }
+        }
+        else
+        {
+            if (freeVar2node.find(n.toString()) != freeVar2node.end())
+            {
+                return freeVar2node[n.toString()];
+            }
+            else
+            {
+                std::vector<Node> cnodes;
+                int id = freeVar2node.size();
+                cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(id), false)));
+                Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
+                cnodes.push_back(gt);
+                Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
+                freeVar2node[n.toString()] = ret;
+                return ret;
+            }
+        }
+
+    }
+
+    std::vector<Node> children;
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
+    {
+        children.push_back(n.getOperator());
+    }
+    
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        children.push_back(rename(n[i], freeVar2node, boundVar2node, nodeManager));
+    }
+
+    // std::cout << freeVar2node.size() << " " << boundVar2node.size() << std::endl;
+
+    if (n.getKind() == cvc5::internal::Kind::FORALL || n.getKind() == cvc5::internal::Kind::EXISTS)
+    {
+        Node bound_vars = n[0];
+        // std::cout << "BOUND_VAR_LIST" << std::endl;
+        for (size_t i = 0; i < bound_vars.getNumChildren(); i++)
+        {
+            // std::cout << "Erasing " << bound_vars[i].toString() << ":" << boundVar2node[bound_vars[i].toString()] << std::endl;
+            AssertArgument(boundVar2node.find(bound_vars[i].toString()) != boundVar2node.end(), "Bound variable not found in boundVar2node");
+            boundVar2node.erase(bound_vars[i].toString());
+        }
+    }
+
+
+    
+    return nodeManager->mkNode(n.getKind(), children);
+}
+
+
+
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
     TimerStat::CodeTimer codeTimer(d_statistics.d_passTime);
 
-    const std::vector<Node>& assertions = assertionsToPreprocess->ref();
-
-    std::vector <vertex> nodes;
-    for (const Node& assertion : assertions)
+    /////////////////////////////////////////////////////////////
+    // Step 1: Fix anti-symmetric operators
+    std::vector <Node> assertions;
+    for (const Node& assertion : assertionsToPreprocess->ref())
     {
-        nodes.push_back(getVertex(assertion));
+        assertions.push_back(fixflips(assertion));
     }
 
-    sort(nodes.begin(), nodes.end(), assertionsCmp);
+    // std::cout << "After fix flips:" << std::endl;
+    // for (size_t i = 0; i < assertions.size(); ++i)
+    // {
+    //     std::cout << assertions[i] << std::endl;
+    // }
 
+
+    /////////////////////////////////////////////////////////////
+    // Step 2: Sort the assertions
+    std::vector<NodeInfo> nodeInfos;
+    for (size_t i = 0; i < assertions.size(); ++i)
+    {
+        nodeInfos.push_back(getNodeInfo(assertions[i]));
+    }   
+
+    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp);
+
+    // std::cout << "After sorting:" << std::endl;
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+    //     std::cout << nodeInfos[i].node << std::endl;
+    //     std::cout << nodeInfos[i].encoding << std::endl;
+    //     std::vector<int> varSeq = nodeInfos[i].varSeq;
+    //     for (size_t j = 0; j < varSeq.size(); j++)
+    //     {
+    //         std::cout << varSeq[j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    //     std::cout << "----" << std::endl;
+    // }
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 3: Variable normalization
+    std::map<std::string, Node> freeVar2node;
+    std::map<std::string, Node> boundVar2node;
+    NodeManager* nodeManager = NodeManager::currentNM();
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        // std::cout << "RENAMING " << nodeInfos[i].node << std::endl;
+        Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
+        nodeInfos[i] = getNodeInfo(renamed);
+        // std::cout << "RENAMED " << renamed << std::endl;
+        // std::cout << "---------------------------------" << std::endl;
+    }
+
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 4: Sort operands of commutative operators
+
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        Node reordered = reorder(nodeInfos[i].node);
+        nodeInfos[i] = getNodeInfo(reordered);
+    }
+
+    //ToDO? sort alpha-equivalent ones in the end
+
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        assertionsToPreprocess->replace(i, nodeInfos[i].node);
+        std::cout << nodeInfos[i].node << std::endl;
+    }
+
+
+
+    // std::cout << "Current logic is " << d_env.getLogicInfo().getLogicString() << std::endl;
+
+    // const std::vector<Node>& assertions = assertionsToPreprocess->ref();
+
+    // std::vector <vertex> nodes;
+    // for (const Node& assertion : assertions)
+    // {
+    //     nodes.push_back(getVertex(assertion));
+    // }
+
+    // sort(nodes.begin(), nodes.end(), assertionsCmp);
+
+
+    // // std::cout << "After sorting:" << std::endl;
+    // // for (size_t i = 0; i < nodes.size(); i++)
+    // // {
+    // //     std::cout << nodes[i].node << std::endl;
+    // //     std::cout << nodes[i].encoding << std::endl;
+    // //     std::cout << "----" << std::endl;
+    // // }
+    // // std::cout << "---------------------------------" << std::endl;
 
         
-    // VARIABLE NORMALIZATION
+    // // VARIABLE NORMALIZATION
 
-    // Map variables to integers
-    std::map<std::string, unsigned> varMap;
-    unsigned id = 1;
-    for (size_t i = 0; i < nodes.size(); i++)
-    {
-        for (size_t j = 0; j < nodes[i].varNames.size(); j++)
-        {
-            if (varMap.find(nodes[i].varNames[j]) == varMap.end())
-            {
-                varMap[nodes[i].varNames[j]] = id++;
-                // std::cout << "Mapped " << nodes[i].varNames[j] << " to " << varMap[nodes[i].varNames[j]] << std::endl;
-            }
-        }
-    }
+    // // Map variables to integers
+    // std::map<std::string, unsigned> varMap;
+    // unsigned id = 1;
+    // for (size_t i = 0; i < nodes.size(); i++)
+    // {
+    //     for (size_t j = 0; j < nodes[i].varNames.size(); j++)
+    //     {
+    //         if (varMap.find(nodes[i].varNames[j]) == varMap.end())
+    //         {
+    //             varMap[nodes[i].varNames[j]] = id++;
+    //             // std::cout << "Mapped " << nodes[i].varNames[j] << " to " << varMap[nodes[i].varNames[j]] << std::endl;
+    //         }
+    //     }
+    // }
     
-    // std::cout << std::endl;
+    // // std::cout << std::endl;
 
-    // Construct dependency graph
-    for (size_t i = 0; i < nodes.size(); i++)
-    {
-        for (size_t j = 0; j < i; j++)
-        {
-            if (nodes[i].encoding == nodes[j].encoding)
-            {
-                std::pair<std::string, std::string> diffVars = getFirstDiffVars(nodes[j].varNames, nodes[i].varNames);
-                std::string var_j = diffVars.first;
-                std::string var_i = diffVars.second;
-                int vj = varMap[var_j], vi = varMap[var_i];
-                // std::cout << "Edge " << vj << " -> " << vi << std::endl;
-                adj[vj].push_back(vi);
-            }
-        }
-    }
+    // // Construct dependency graph
+    // for (size_t i = 0; i < nodes.size(); i++)
+    // {
+    //     for (size_t j = 0; j < i; j++)
+    //     {
+    //         if (nodes[i].encoding == nodes[j].encoding)
+    //         {
+    //             std::pair<std::string, std::string> diffVars = getFirstDiffVars(nodes[j].varNames, nodes[i].varNames);
+    //             std::string var_j = diffVars.first;
+    //             std::string var_i = diffVars.second;
+    //             int vj = varMap[var_j], vi = varMap[var_i];
+    //             // std::cout << "Edge " << var_j << " -> " << var_i << std::endl;
+    //             adj[vj].push_back(vi);
+    //         }
+    //     }
+    // }
 
-    // Topological sort
-    std::stack<int> st;
-    std::vector<bool> mark(id + 1, false);
-    for (size_t i = 1; i < id; i++)
-    {
-        if (!mark[i])
-        {
-            topolsort(i, mark, st);
-        }
-    }
+    // // Topological sort
+    // std::stack<int> st;
+    // std::vector<bool> mark(id + 1, false);
+    // for (size_t i = 1; i < id; i++)
+    // {
+    //     if (!mark[i])
+    //     {
+    //         topolsort(i, mark, st);
+    //     }
+    // }
 
-    // Assign new names (v_counter) to variables based on topological order
-    std::map<int, int> normVar;
-    unsigned counter = 1;
-    while (!st.empty())
-    {
-        int v = st.top();
-        st.pop();
-        normVar[v] = counter++;
-    }
+    // // Assign new names (v_counter) to variables based on topological order
+    // std::map<int, int> normVar;
+    // unsigned counter = 1;
+    // while (!st.empty())
+    // {
+    //     int v = st.top();
+    //     st.pop();
+    //     normVar[v] = counter++;
+    //     // std::cout << "Renamed " << v << " to v" << normVar[v] << std::endl;
+    // }
 
 
-    // Rebuild the assertions
-    NodeManager* nodeManager = NodeManager::currentNM();
-    for (size_t i = 0; i < nodes.size(); i++)
-    {
-        // std::cout << "Before pass:" << std::endl;
-        // std::cout << nodes[i].node << std::endl;
-        Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
-        // std::cout << "Renamed " << renamed << std::endl;
-        Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
-        // std::cout << "Reordered " << reordered << std::endl;
-        Node flipped = fixflips(reordered);                                             // fix the flips
-        // std::cout << "After pass:" << std::endl;
-        // std::cout << flipped << std::endl;
-        // std::cout << "---------------------------------" << std::endl;
-        assertionsToPreprocess->replace(i, flipped);
-    }
+    // // Rebuild the assertions
+    // // std::cout << "End of pass:" << std::endl;
+    // NodeManager* nodeManager = NodeManager::currentNM();
+    // for (size_t i = 0; i < nodes.size(); i++)
+    // {
+    //     // std::cout << "Before pass:" << std::endl;
+    //     // std::cout << nodes[i].node << std::endl;
+    //     Node renamed = normalize(nodes[i].node, normVar, varMap, nodeManager);          // normalize symbol names
+    //     // std::cout << "Renamed " << renamed << std::endl;
+    //     Node reordered = reorder(renamed);                                              // sort the operands of each commutative operator using the variable names
+    //     // std::cout << "Reordered " << reordered << std::endl;
+    //     Node flipped = fixflips(reordered);                                             // fix the flips
+    //     // std::cout << "After pass:" << std::endl;
+    //     // std::cout << flipped << std::endl;
+    //     // std::cout << "---------------------------------" << std::endl;
+    //     assertionsToPreprocess->replace(i, flipped);
+    // }
 
 
     // exit(0);
