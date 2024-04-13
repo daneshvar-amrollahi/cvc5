@@ -429,12 +429,13 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         // std::cout << "RENAMING " << nodeInfos[i].node << std::endl;
         Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
-        nodeInfos[i] = getNodeInfo(renamed);
+        nodeInfos[i].node = renamed;
         // std::cout << "RENAMED " << renamed << std::endl;
         // std::cout << "---------------------------------" << std::endl;
+        std::cout << renamed << std::endl;
     }
 
-
+    abort();
 
 
     /////////////////////////////////////////////////////////////
@@ -469,8 +470,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
         // std::cout << nodeInfos[i].node << std::endl;
     }
 
-
-
+    abort();
+    
     // std::cout << "Current logic is " << d_env.getLogicInfo().getLogicString() << std::endl;
 
     // const std::vector<Node>& assertions = assertionsToPreprocess->ref();
