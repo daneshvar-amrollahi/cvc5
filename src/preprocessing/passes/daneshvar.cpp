@@ -119,13 +119,12 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
                 return a.varNames[i] < b.varNames[i];
             }
         }
-        
-        return false; // If reaches here, they are totally identical. Doesn't matter. Just return false
+        return false;
     }
     return a.encoding < b.encoding;
 }
 
-bool operandsCmp(const Node& a, const Node& b)
+bool operandsCmpR2(const Node& a, const Node& b)
 {
     std::string sa, sb;
     if (a.isVar() || a.isConst())
@@ -149,6 +148,41 @@ bool operandsCmp(const Node& a, const Node& b)
     }
     return sa < sb;
 }
+
+
+bool operandsCmpR1(const Node& a, const Node& b)
+{
+    std::string sa, sb;
+    if (a.isVar())
+    {
+        sa = "V";
+    }
+    else if (a.isConst())
+    {
+        sa = a.toString();
+    }
+    else
+    {
+        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
+        sa = cvc5::internal::kind::toString(k);
+    }
+
+    if (b.isVar())
+    {
+        sb = "V";
+    } 
+    else if (b.isConst())
+    {
+        sb = b.toString();
+    }
+    else
+    {
+        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
+        sb = cvc5::internal::kind::toString(k);
+    }
+    return sa < sb;
+}
+
 
 std::pair<std::string, std::string> getFirstDiffVars(const std::vector<std::string> &a, const std::vector<std::string> &b)
 {
@@ -207,7 +241,7 @@ int isCommutative(cvc5::internal::Kind k)
     return -1;
 }
 
-Node reorder(Node n)
+Node sortOp(Node n, int round)
 {
     // Sort the operands of each operator using the variable names
     if (n.isVar() || n.isConst())
@@ -217,18 +251,18 @@ Node reorder(Node n)
     std::vector<Node> operands;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        operands.push_back(reorder(n[i]));
+        operands.push_back(sortOp(n[i], round));
     } 
     int commutative = isCommutative(n.getKind());
 
 
     if (commutative == 0)
     {
-        std::sort(operands.begin(), operands.end(), operandsCmp);
+        std::sort(operands.begin(), operands.end(), round == 1 ? operandsCmpR1 : operandsCmpR2);
 
     } else if (commutative == 1)
     {
-        std::sort(operands.begin() + 1, operands.end(), operandsCmp);
+        std::sort(operands.begin() + 1, operands.end(), round == 1 ? operandsCmpR1 : operandsCmpR2);
     }
 
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -393,9 +427,18 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     std::cout << assertions[i] << std::endl;
     // }
 
+    /////////////////////////////////////////////////////////////
+    // Step 2: Sort operands of commutative operators
+    for (size_t i = 0; i < assertions.size(); ++i)
+    {
+        assertions[i] = sortOp(assertions[i], 1);
+    }
+
+
+
 
     /////////////////////////////////////////////////////////////
-    // Step 2: Sort the assertions
+    // Step 3: Sort the assertions based on their encoding
     std::vector<NodeInfo> nodeInfos;
     for (size_t i = 0; i < assertions.size(); ++i)
     {
@@ -404,27 +447,28 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp);
 
-    // std::cout << "After sorting:" << std::endl;
-    // for (size_t i = 0; i < nodeInfos.size(); i++)
-    // {
-        // std::cout << nodeInfos[i].node << std::endl;
+    std::cout << "After sorting:" << std::endl;
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        std::cout << nodeInfos[i].node << std::endl;
         // std::cout << nodeInfos[i].encoding << std::endl;
         // std::vector<int> varSeq = nodeInfos[i].varSeq;
-        // for (size_t j = 0; j < varSeq.size(); j++)
-        // {
-        //     std::cout << varSeq[j] << " ";
-        // }
+        // // for (size_t j = 0; j < varSeq.size(); j++)
+        // // {
+        // //     std::cout << varSeq[j] << " ";
+        // // }
         // std::cout << std::endl;
         // std::cout << "----" << std::endl;
-    // }
+    }
 
-
+    std::cout << "---------------------------------" << std::endl;
 
     /////////////////////////////////////////////////////////////
-    // Step 3: Variable normalization
+    // Step 4: Variable normalization
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
+    std::cout << "After renaming:" << std::endl;
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         // std::cout << "RENAMING " << nodeInfos[i].node << std::endl;
@@ -439,15 +483,18 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
     /////////////////////////////////////////////////////////////
-    // Step 4: Sort operands of commutative operators
+    // Step 5: Sort operands of commutative operators
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
-        Node reordered = reorder(nodeInfos[i].node);
+        Node reordered = sortOp(nodeInfos[i].node, 2);
         nodeInfos[i] = getNodeInfo(reordered);
     }
 
-    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); // Sort again
+
+    /////////////////////////////////////////////////////////////
+    // Step 6: Final sort
+    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
 
 
 
@@ -467,7 +514,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        // std::cout << nodeInfos[i].node << std::endl;
+        std::cout << nodeInfos[i].node << std::endl;
     }
 
     abort();
