@@ -110,7 +110,17 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
                 return a.varSeq[i] < b.varSeq[i];
             }
         }
-        AssertArgument(false, a.node.toString() + " and " + b.node.toString() + " have the same encoding but different nodes");
+        // Now we have two alpha-equivalent nodes. Compare lexico-graphically
+        n = a.varNames.size();
+        for (size_t i = 0; i < n; i++)
+        {
+            if (a.varNames[i] != b.varNames[i])
+            {
+                return a.varNames[i] < b.varNames[i];
+            }
+        }
+        
+        return false; // If reaches here, they are totally identical. Doesn't matter. Just return false
     }
     return a.encoding < b.encoding;
 }
@@ -152,24 +162,6 @@ std::pair<std::string, std::string> getFirstDiffVars(const std::vector<std::stri
     }
     return std::make_pair("", ""); // ToDo: Add assertion failed
 }
-
-const int maxN = 1e5 + 10; // Maximum number of variable names
-std::vector<int> adj[maxN];
-
-void topolsort(int v, std::vector<bool> &mark, std::stack<int> &st)
-{
-    mark[v] = true;
-    for (int u : adj[v])
-    {
-        if (!mark[u])
-        {
-            topolsort(u, mark, st);
-        }
-    }
-    st.push(v);
-}
-
-std::map<int, Node> var2node;
 
 
 // Return vector index >= 0 (from where the list of children is commutative)
@@ -301,76 +293,6 @@ Node fixflips(Node n)
 }
 
 
-
-
-
-Node normalize(Node n, std::map<int, int> &normVar, std::map<std::string, unsigned> &varMap, NodeManager* nodeManager, bool insideQuantifierBody = false)
-{
-    if (n.isVar())
-    {
-        std::string varname = n.toString();
-        int v = varMap[varname];
-        int newv = normVar[v];
-        
-        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
-        {
-            Node ret = nodeManager->mkBoundVar("v" + std::to_string(newv), n.getType());
-            if (var2node.find(newv) == var2node.end())
-            {
-                var2node[newv] = ret;
-                return ret;
-            }
-            else
-            {
-                return var2node[newv];
-            }
-        }
-
-        std::vector<Node> cnodes;
-        cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(newv), false)));
-        Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
-        cnodes.push_back(gt);
-        auto ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes); 
-
-
-        if (var2node.find(newv) == var2node.end())
-        {
-            var2node[newv] = ret;
-            return ret;
-        }
-        else
-        {
-            return var2node[newv];
-        }
-    }
-    if (n.isConst())
-    {
-        return n;
-    }
-    std::vector<Node> children;
-
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        // std::cout << "PARAMETERIZED" << std::endl;
-        children.push_back(n.getOperator());
-    }
-
-    
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        children.push_back(normalize(n[i], normVar, varMap, nodeManager));
-    }
-    
-    auto ret = nodeManager->mkNode(n.getKind(), children);
-
-    return ret;
-}
-
-
-
-
-
 Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
@@ -485,15 +407,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // std::cout << "After sorting:" << std::endl;
     // for (size_t i = 0; i < nodeInfos.size(); i++)
     // {
-    //     std::cout << nodeInfos[i].node << std::endl;
-    //     std::cout << nodeInfos[i].encoding << std::endl;
-    //     std::vector<int> varSeq = nodeInfos[i].varSeq;
-    //     for (size_t j = 0; j < varSeq.size(); j++)
-    //     {
-    //         std::cout << varSeq[j] << " ";
-    //     }
-    //     std::cout << std::endl;
-    //     std::cout << "----" << std::endl;
+        // std::cout << nodeInfos[i].node << std::endl;
+        // std::cout << nodeInfos[i].encoding << std::endl;
+        // std::vector<int> varSeq = nodeInfos[i].varSeq;
+        // for (size_t j = 0; j < varSeq.size(); j++)
+        // {
+        //     std::cout << varSeq[j] << " ";
+        // }
+        // std::cout << std::endl;
+        // std::cout << "----" << std::endl;
     // }
 
 
@@ -524,12 +446,27 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos[i] = getNodeInfo(reordered);
     }
 
-    //ToDO? sort alpha-equivalent ones in the end
+    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); // Sort again
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 5: Final renaming
+    // freeVar2node.clear();
+    // boundVar2node.clear();
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+    //     std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
+    //     Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
+    //     std::cout << "RENAMED " << std::endl << renamed << std::endl;
+    //     nodeInfos[i] = getNodeInfo(renamed);
+    //     std::cout << "---------------------------------" << std::endl;
+    // }
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        std::cout << nodeInfos[i].node << std::endl;
+        // std::cout << nodeInfos[i].node << std::endl;
     }
 
 
