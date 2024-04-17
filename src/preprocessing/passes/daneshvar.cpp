@@ -429,8 +429,7 @@ Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
     std::map<std::string, Node> &boundVar2node, 
-    NodeManager* nodeManager, 
-    bool insideQuantifierBody = false)
+    NodeManager* nodeManager)
 {
     // std::cout << "Renaming " << n << std::endl;
     if (n.isConst())
