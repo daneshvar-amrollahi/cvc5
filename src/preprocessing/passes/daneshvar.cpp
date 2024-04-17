@@ -224,7 +224,7 @@ bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
         }
     }
     // We don't care at this point :)
-    return true;
+    return false;
 }
 
 bool complexCmp(const NodeInfo& a, const NodeInfo& b)
@@ -274,7 +274,7 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         }
     }
     // We don't care at this point :)
-    return true;   
+    return false;   
 }
 
 
@@ -519,7 +519,7 @@ bool sameClass(NodeInfo a, NodeInfo b)
             return false;
         }
     }
-    return true;
+    return false;
 }
 
 
@@ -558,7 +558,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         nodeInfos.push_back(getNodeInfo(assertions[i]));
     }
-    sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); // sort solely based on encoding
+    sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); // Sort based on encoding and pattern
 
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
