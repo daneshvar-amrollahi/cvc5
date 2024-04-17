@@ -176,8 +176,9 @@ bool operandsCmpR2(const Node& a, const Node& b)
 }
 
 
-bool operandsCmpR1(const Node& a, const Node& b)
+bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 {
+    Node a = nia.node, b = nib.node;
     std::string sa, sb;
     if (a.isVar())
     {
@@ -206,7 +207,13 @@ bool operandsCmpR1(const Node& a, const Node& b)
         cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
         sb = cvc5::internal::kind::toString(k);
     }
-    return sa < sb;
+    if (sa != sb)
+    {
+        return sa < sb;
+    }
+    // ToDo: Check the patterns in next equivalent classes
+
+    return false;
 }
 
 bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
@@ -336,18 +343,17 @@ int isCommutative(cvc5::internal::Kind k)
 }
 
 
-Node sortOp1(Node n)
+Node sortOp1(NodeInfo ni)
 {
+    Node n = ni.node;
     if (n.isVar() || n.isConst())
     {
-        // std::cout << "Returning " << n << std::endl;
         return n;
     }
-    std::vector<Node> operands;
+    std::vector<NodeInfo> child;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        // std::cout << "Child " << i << " of " << n << " is " << n[i] << std::endl;
-        operands.push_back(sortOp1(n[i]));
+        child.push_back(getNodeInfo(sortOp1(getNodeInfo(n[i]))));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -355,11 +361,17 @@ Node sortOp1(Node n)
     if (commutative == 0)
     {
         // std::cout << "Sorting " << n << std::endl;
-        std::sort(operands.begin(), operands.end(), operandsCmpR1);
+        std::sort(child.begin(), child.end(), operandsCmpR1);
 
     } else if (commutative == 1)
     {
-        std::sort(operands.begin() + 1, operands.end(), operandsCmpR1);
+        std::sort(child.begin() + 1, child.end(), operandsCmpR1);
+    }
+
+    std::vector<Node> operands;
+    for (size_t i = 0; i < child.size(); i++)
+    {
+        operands.push_back(child[i].node);
     }
 
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -593,7 +605,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node curr = sortOp1(ni.node);
+        Node curr = sortOp1(ni);
         nodeInfos.push_back(getNodeInfo(curr));
     }
 
