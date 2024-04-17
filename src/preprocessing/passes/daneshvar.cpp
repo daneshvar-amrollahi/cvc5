@@ -335,7 +335,44 @@ int isCommutative(cvc5::internal::Kind k)
     return -1;
 }
 
-Node sortOp(Node n, int round)
+
+Node sortOp1(Node n)
+{
+    if (n.isVar() || n.isConst())
+    {
+        // std::cout << "Returning " << n << std::endl;
+        return n;
+    }
+    std::vector<Node> operands;
+    for (size_t i = 0; i < n.getNumChildren(); i++)
+    {
+        // std::cout << "Child " << i << " of " << n << " is " << n[i] << std::endl;
+        operands.push_back(sortOp1(n[i]));
+    } 
+    int commutative = isCommutative(n.getKind());
+
+
+    if (commutative == 0)
+    {
+        // std::cout << "Sorting " << n << std::endl;
+        std::sort(operands.begin(), operands.end(), operandsCmpR1);
+
+    } else if (commutative == 1)
+    {
+        std::sort(operands.begin() + 1, operands.end(), operandsCmpR1);
+    }
+
+    if (n.getMetaKind() == metakind::PARAMETERIZED)
+    {
+        operands.insert(operands.begin(), n.getOperator());
+    }
+
+
+    return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
+}
+
+
+Node sortOp2(Node n)
 {
     // std::cout << "Sort op called for " << n << std::endl;
     if (n.isVar() || n.isConst())
@@ -347,7 +384,7 @@ Node sortOp(Node n, int round)
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         // std::cout << "Child " << i << " of " << n << " is " << n[i] << std::endl;
-        operands.push_back(sortOp(n[i], round));
+        operands.push_back(sortOp2(n[i]));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -355,11 +392,11 @@ Node sortOp(Node n, int round)
     if (commutative == 0)
     {
         // std::cout << "Sorting " << n << std::endl;
-        std::sort(operands.begin(), operands.end(), round == 1 ? operandsCmpR1 : operandsCmpR2);
+        std::sort(operands.begin(), operands.end(), operandsCmpR2);
 
     } else if (commutative == 1)
     {
-        std::sort(operands.begin() + 1, operands.end(), round == 1 ? operandsCmpR1 : operandsCmpR2);
+        std::sort(operands.begin() + 1, operands.end(), operandsCmpR2);
     }
 
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -527,12 +564,16 @@ PreprocessingPassResult Daneshvar::applyInternal(
 {
     TimerStat::CodeTimer codeTimer(d_statistics.d_passTime);
 
+    std::vector<NodeInfo> nodeInfos, prv_nodeInfos;
+
+
+
     /////////////////////////////////////////////////////////////
     // Step 1: Fix anti-symmetric operators
-    std::vector <Node> assertions;
     for (const Node& assertion : assertionsToPreprocess->ref())
     {
-        assertions.push_back(fixflips(assertion));
+        Node curr = fixflips(assertion);
+        nodeInfos.push_back(getNodeInfo(curr));
     }
 
     std::cout << "FIXED FLIPS" << std::endl;
@@ -545,9 +586,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 2: Sort operands of commutative operators to fix structure
-    for (size_t i = 0; i < assertions.size(); ++i)
+    //ToDo: Add pattern check. If equal, look for super-pattern
+
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
+    for (NodeInfo ni: prv_nodeInfos)
     {
-        assertions[i] = sortOp(assertions[i], 1);
+        Node curr = sortOp1(ni.node);
+        nodeInfos.push_back(getNodeInfo(curr));
     }
 
     std::cout << "SORTED OPERANDS" << std::endl;
@@ -556,11 +603,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////
     // Step 2.5: Calculate equivalence classes
     // a ~ b if they have the same encoding and the same pattern
-    std::vector<NodeInfo> nodeInfos;
-    for (size_t i = 0; i < assertions.size(); ++i)
-    {
-        nodeInfos.push_back(getNodeInfo(assertions[i]));
-    }
+
+
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); // Sort based on encoding and pattern
 
     unsigned ecId = 1;
@@ -586,14 +630,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 3: Sort the assertions based on our super complex metric!
-    std::vector<NodeInfo> nnodeInfos;
+    
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
 
-    for (size_t i = 0; i < nodeInfos.size(); i++)
+
+    for (NodeInfo ni: prv_nodeInfos)
     {
-        nnodeInfos.push_back(getNodeInfo(nodeInfos[i].node, nodeInfos[i].equivClassId));
+        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId));
     }
-
-    nodeInfos = nnodeInfos;
 
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
 
@@ -615,30 +660,33 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 4: Variable normalization left ro right top to bottom
+
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
     // std::cout << "After renaming:" << std::endl;
-    for (size_t i = 0; i < nodeInfos.size(); i++)
+    for (NodeInfo ni: prv_nodeInfos)
     {
-        // std::cout << "RENAMING " << nodeInfos[i].node << std::endl;
-        Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
-        nodeInfos[i].node = renamed;
-        // std::cout << "RENAMED " << renamed << std::endl;
-        // std::cout << "---------------------------------" << std::endl;
-        // std::cout << renamed << std::endl;
+        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
+        nodeInfos.push_back(getNodeInfo(renamed));
     }
 
     std::cout << "RENAMED VARIABLES" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 5: Sort operands of commutative operators
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
 
-    for (size_t i = 0; i < nodeInfos.size(); i++)
+    for (NodeInfo ni: prv_nodeInfos)
     {
-        Node reordered = sortOp(nodeInfos[i].node, 2);
-        nodeInfos[i] = getNodeInfo(reordered);
+        Node reordered = sortOp2(ni.node);
+        nodeInfos.push_back(getNodeInfo(reordered));
     }
+
 
     std::cout << "SORTED OPERANDS" << std::endl;
 
