@@ -273,7 +273,7 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
             return spat_a[i] < spat_b[i];
         }
     }
-    // We don't care at this point :)
+    // We don't care at this point. But apparently we should :')
     return false;   
 }
 
@@ -567,19 +567,19 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
-    // std::cout << "EC1" << std::endl;
-    // std::cout << nodeInfos[0].encoding << std::endl;
+    std::cout << "EC1" << std::endl;
+    std::cout << nodeInfos[0].encoding << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
-            // std::cout << "******" << std::endl;
-            // std::cout << "EC" << ecId << std::endl;
+            std::cout << "******" << std::endl;
+            std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
-        // std::cout << nodeInfos[i].encoding << std::endl;
+        std::cout << nodeInfos[i].encoding << std::endl;
     }
 
     std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
@@ -600,20 +600,19 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     std::cout << "SORTED ASSERTIONS" << std::endl;
 
-    // std::cout << "After sorting:" << std::endl;
-    // for (size_t i = 0; i < nodeInfos.size(); i++)
-    // {
-    //     std::cout << nodeInfos[i].node << std::endl;
-    //     // std::cout << nodeInfos[i].encoding << std::endl;
-    //     // std::vector<int> pat = nodeInfos[i].pat;
-    //     // // for (size_t j = 0; j < pat.size(); j++)
-    //     // // {
-    //     // //     std::cout << pat[j] << " ";
-    //     // // }
-    //     // std::cout << std::endl;
-    //     // std::cout << "----" << std::endl;
-    // }
-    // std::cout << "---------------------------------" << std::endl;
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        std::cout << nodeInfos[i].node << std::endl;
+        std::cout << nodeInfos[i].encoding << std::endl;
+        std::vector<int> pat = nodeInfos[i].pat;
+        // for (size_t j = 0; j < pat.size(); j++)
+        // {
+        //     std::cout << pat[j] << " ";
+        // }
+        std::cout << std::endl;
+        std::cout << "----" << std::endl;
+    }
+    std::cout << "---------------------------------" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 4: Variable normalization left ro right top to bottom
