@@ -607,17 +607,17 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-    /////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////
     // Step 5: Final renaming
     // freeVar2node.clear();
     // boundVar2node.clear();
     // for (size_t i = 0; i < nodeInfos.size(); i++)
     // {
-    //     std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
+    //     // std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
     //     Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
-    //     std::cout << "RENAMED " << std::endl << renamed << std::endl;
+    //     // std::cout << "RENAMED " << std::endl << renamed << std::endl;
     //     nodeInfos[i] = getNodeInfo(renamed);
-    //     std::cout << "---------------------------------" << std::endl;
+    //     // std::cout << "---------------------------------" << std::endl;
     // }
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
