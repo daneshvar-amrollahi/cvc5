@@ -73,8 +73,12 @@ struct NodeInfo
     std::vector<int> pat;
     std::vector<std::string> varNames; 
     std::map<std::string, int> role;
-    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r) : node(n), encoding(e), pat(p), varNames(vn), role(r) {}
+    unsigned equivClassId;
+    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId) : 
+        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId(ecId) {}
 };
+
+std::map<int, std::vector<NodeInfo>> ec;
 
 int getRole(std::string var, NodeInfo n)
 {
@@ -85,9 +89,9 @@ int getRole(std::string var, NodeInfo n)
     return 0;
 }
 
-NodeInfo getNodeInfo(Node n)
+NodeInfo getNodeInfo(Node n, unsigned ecId = 0)
 {
-    std::cout << "Constructing node info for " << n << std::endl;
+    // std::cout << "Constructing node info for " << n << std::endl;
 
     std::string encoding = "";
     std::vector<std::string> varNames; 
@@ -104,12 +108,12 @@ NodeInfo getNodeInfo(Node n)
         {
             varMap[varNames[i]] = id++;
             role[varNames[i]] = varMap[varNames[i]];
-            std::cout << "Role of " << varNames[i] << " is " << role[varNames[i]] << std::endl;
+            // std::cout << "Role of " << varNames[i] << " is " << role[varNames[i]] << std::endl;
         }
         pat.push_back(varMap[varNames[i]]);
     }
-    std::cout << "---------------------------------" << std::endl;
-    return NodeInfo(n, encoding, pat, varNames, role);
+    // std::cout << "---------------------------------" << std::endl;
+    return NodeInfo(n, encoding, pat, varNames, role, ecId);
 }
 
 
@@ -199,9 +203,58 @@ bool operandsCmpR1(const Node& a, const Node& b)
     return sa < sb;
 }
 
+bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
+{
+    return a.encoding < b.encoding;
+}
+
 bool complexCmp(const NodeInfo& a, const NodeInfo& b)
 {
-    // ToDo
+    if (a.equivClassId  != b.equivClassId)
+    {
+        return a.encoding < b.encoding; // should be same as a.equivalenceClassId < b.equivalenceClassId (Add ssertion)
+    }
+
+    // Calculate the super-pattern of a and b and compare them lexico-graphically
+    int ecId = a.equivClassId;
+    std::vector<int> spat_a, spat_b;
+    for (int i = 0; i < a.varNames.size(); i++)
+    {
+        if (a.varNames[i] == b.varNames[i])
+        {
+            continue;
+        }
+        std::string var_a = a.varNames[i], var_b = b.varNames[i]; // first different variables in a and b
+        // Calculate super-pattern of var_a and var_b in next equivalent classes
+        for (int j = ecId + 1; ec[j].size() > 0; j++)
+        {
+            std::vector<int> pat_j_a, pat_j_b;
+            for (NodeInfo curr : ec[j])
+            {
+                pat_j_a.push_back(getRole(var_a, curr));
+                pat_j_b.push_back(getRole(var_b, curr));
+            }
+            sort(pat_j_a.begin(), pat_j_a.end());
+            sort(pat_j_b.begin(), pat_j_b.end());
+            // Append pattern of var_a in ec[j] to spat_a
+            for (int k = 0; k < pat_j_a.size(); k++)
+            {
+                spat_a.push_back(pat_j_a[k]);
+                spat_b.push_back(pat_j_b[k]);
+            }
+        }
+    }
+
+    // Compare the super-patterns
+    int n = spat_a.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (spat_a[i] != spat_b[i])
+        {
+            return spat_a[i] < spat_b[i];
+        }
+    }
+    // We don't care at this point :)
     return true;   
 }
 
@@ -457,39 +510,66 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
 
-
-
     /////////////////////////////////////////////////////////////
-    // Step 3: Sort the assertions based on their encoding
+    // Step 2.5: Calculate equivalence classes
     std::vector<NodeInfo> nodeInfos;
     for (size_t i = 0; i < assertions.size(); ++i)
     {
         nodeInfos.push_back(getNodeInfo(assertions[i]));
-    }   
+    }
+    sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); // sort solely based on encoding
+
+    unsigned ecId = 1;
+    nodeInfos[0].equivClassId = ecId;
+    ec[ecId].push_back(nodeInfos[0]);
+    for (size_t i = 1; i < nodeInfos.size(); i++)
+    {
+        if (nodeInfos[i].encoding != nodeInfos[i - 1].encoding)
+        {
+            ecId++;
+        }
+        nodeInfos[i].equivClassId = ecId;
+        ec[ecId].push_back(nodeInfos[i]);
+        // std::cout << "Node " << nodeInfos[i].node << " is in equivalence class " << ecId << std::endl;
+    }
+
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 3: Sort the assertions based on our super complex metric!
+    std::vector<NodeInfo> nnodeInfos;
+
+    for (size_t i = 0; i < nodeInfos.size(); i++)
+    {
+        nnodeInfos.push_back(getNodeInfo(nodeInfos[i].node, nodeInfos[i].equivClassId));
+    }
+
+    nodeInfos = nnodeInfos;
 
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
 
-    std::cout << "After sorting:" << std::endl;
-    for (size_t i = 0; i < nodeInfos.size(); i++)
-    {
-        std::cout << nodeInfos[i].node << std::endl;
-        // std::cout << nodeInfos[i].encoding << std::endl;
-        // std::vector<int> pat = nodeInfos[i].pat;
-        // // for (size_t j = 0; j < pat.size(); j++)
-        // // {
-        // //     std::cout << pat[j] << " ";
-        // // }
-        // std::cout << std::endl;
-        // std::cout << "----" << std::endl;
-    }
-    std::cout << "---------------------------------" << std::endl;
+    // std::cout << "After sorting:" << std::endl;
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+    //     std::cout << nodeInfos[i].node << std::endl;
+    //     // std::cout << nodeInfos[i].encoding << std::endl;
+    //     // std::vector<int> pat = nodeInfos[i].pat;
+    //     // // for (size_t j = 0; j < pat.size(); j++)
+    //     // // {
+    //     // //     std::cout << pat[j] << " ";
+    //     // // }
+    //     // std::cout << std::endl;
+    //     // std::cout << "----" << std::endl;
+    // }
+    // std::cout << "---------------------------------" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 4: Variable normalization left ro right top to bottom
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
-    std::cout << "After renaming:" << std::endl;
+    // std::cout << "After renaming:" << std::endl;
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         // std::cout << "RENAMING " << nodeInfos[i].node << std::endl;
@@ -497,10 +577,9 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos[i].node = renamed;
         // std::cout << "RENAMED " << renamed << std::endl;
         // std::cout << "---------------------------------" << std::endl;
-        std::cout << renamed << std::endl;
+        // std::cout << renamed << std::endl;
     }
 
-    abort();
 
 
     /////////////////////////////////////////////////////////////
@@ -514,7 +593,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
     /////////////////////////////////////////////////////////////
-    // Step 6: Final sort
+    // Step 6: Final sort within equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
 
 
