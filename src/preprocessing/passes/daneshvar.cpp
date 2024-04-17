@@ -146,6 +146,7 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
 
 bool operandsCmpR2(const Node& a, const Node& b)
 {
+    // std::cout << "Comparing " << a << " and " << b << std::endl;
     std::string sa, sb;
     if (a.isVar() || a.isConst())
     {
@@ -153,8 +154,9 @@ bool operandsCmpR2(const Node& a, const Node& b)
     }
     else
     {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
-        sa = cvc5::internal::kind::toString(k);
+        // cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
+        // sa = cvc5::internal::kind::toString(k);
+        sa = a.toString();
     }
 
     if (b.isVar() || b.isConst())
@@ -163,9 +165,12 @@ bool operandsCmpR2(const Node& a, const Node& b)
     }
     else
     {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
-        sb = cvc5::internal::kind::toString(k);
+        // cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
+        // sb = cvc5::internal::kind::toString(k);
+        sb = b.toString();
     }
+    // std::cout << "sa=" << sa << ", sb=" << sb << std::endl;
+    // std::cout << "*****" << std::endl;
     return sa < sb;
 }
 
@@ -318,14 +323,16 @@ int isCommutative(cvc5::internal::Kind k)
 
 Node sortOp(Node n, int round)
 {
-    // Sort the operands of each operator using the variable names
+    // std::cout << "Sort op called for " << n << std::endl;
     if (n.isVar() || n.isConst())
     {
+        // std::cout << "Returning " << n << std::endl;
         return n;
     }
     std::vector<Node> operands;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
+        // std::cout << "Child " << i << " of " << n << " is " << n[i] << std::endl;
         operands.push_back(sortOp(n[i], round));
     } 
     int commutative = isCommutative(n.getKind());
@@ -333,6 +340,7 @@ Node sortOp(Node n, int round)
 
     if (commutative == 0)
     {
+        // std::cout << "Sorting " << n << std::endl;
         std::sort(operands.begin(), operands.end(), round == 1 ? operandsCmpR1 : operandsCmpR2);
 
     } else if (commutative == 1)
@@ -344,6 +352,7 @@ Node sortOp(Node n, int round)
     {
         operands.insert(operands.begin(), n.getOperator());
     }
+
 
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);
 }
