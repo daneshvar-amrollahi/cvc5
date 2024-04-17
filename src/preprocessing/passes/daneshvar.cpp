@@ -139,6 +139,7 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
                 return a.varNames[i] < b.varNames[i];
             }
         }
+        // Same encoding, same pattern, same variable sequence. We don't care at this point :)
         return false;
     }
     return a.encoding < b.encoding;
@@ -210,20 +211,33 @@ bool operandsCmpR1(const Node& a, const Node& b)
 
 bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
 {
-    return a.encoding < b.encoding;
+    if (a.encoding != b.encoding)
+    {
+        return a.encoding < b.encoding;
+    }
+    int n = a.pat.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (a.pat[i] != b.pat[i])
+        {
+            return a.pat[i] < b.pat[i];
+        }
+    }
+    // We don't care at this point :)
+    return true;
 }
 
 bool complexCmp(const NodeInfo& a, const NodeInfo& b)
 {
     if (a.equivClassId  != b.equivClassId)
     {
-        return a.encoding < b.encoding; // should be same as a.equivalenceClassId < b.equivalenceClassId (Add ssertion)
+        return a.equivClassId < b.equivClassId;
     }
 
     // Calculate the super-pattern of a and b and compare them lexico-graphically
-    int ecId = a.equivClassId;
+    int ecId = a.equivClassId; // also b.equivClassId
     std::vector<int> spat_a, spat_b;
-    for (int i = 0; i < a.varNames.size(); i++)
+    for (int i = 0; i < a.varNames.size(); ++i)
     {
         if (a.varNames[i] == b.varNames[i])
         {
@@ -231,7 +245,7 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         }
         std::string var_a = a.varNames[i], var_b = b.varNames[i]; // first different variables in a and b
         // Calculate super-pattern of var_a and var_b in next equivalent classes
-        for (int j = ecId + 1; ec[j].size() > 0; j++)
+        for (int j = ecId + 1; ec[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
             for (NodeInfo curr : ec[j])
@@ -491,6 +505,23 @@ Node rename(
 }
 
 
+bool sameClass(NodeInfo a, NodeInfo b)
+{
+    if (a.encoding != b.encoding)
+    {
+        return false;
+    }
+    int n = a.pat.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (a.pat[i] != b.pat[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
@@ -512,7 +543,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // }
 
     /////////////////////////////////////////////////////////////
-    // Step 2: Sort operands of commutative operators
+    // Step 2: Sort operands of commutative operators to fix structure
     for (size_t i = 0; i < assertions.size(); ++i)
     {
         assertions[i] = sortOp(assertions[i], 1);
@@ -521,6 +552,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 2.5: Calculate equivalence classes
+    // a ~ b if they have the same encoding and the same pattern
     std::vector<NodeInfo> nodeInfos;
     for (size_t i = 0; i < assertions.size(); ++i)
     {
@@ -533,7 +565,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     ec[ecId].push_back(nodeInfos[0]);
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
-        if (nodeInfos[i].encoding != nodeInfos[i - 1].encoding)
+        if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
         }
