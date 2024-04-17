@@ -519,7 +519,7 @@ bool sameClass(NodeInfo a, NodeInfo b)
             return false;
         }
     }
-    return false;
+    return true;
 }
 
 
@@ -536,6 +536,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
         assertions.push_back(fixflips(assertion));
     }
 
+    std::cout << "FIXED FLIPS" << std::endl;
+
     // std::cout << "After fix flips:" << std::endl;
     // for (size_t i = 0; i < assertions.size(); ++i)
     // {
@@ -548,6 +550,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         assertions[i] = sortOp(assertions[i], 1);
     }
+
+    std::cout << "SORTED OPERANDS" << std::endl;
 
 
     /////////////////////////////////////////////////////////////
@@ -563,18 +567,22 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
+    // std::cout << "EC1" << std::endl;
+    // std::cout << nodeInfos[0].encoding << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
+            // std::cout << "******" << std::endl;
+            // std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
-        // std::cout << "Node " << nodeInfos[i].node << " is in equivalence class " << ecId << std::endl;
+        // std::cout << nodeInfos[i].encoding << std::endl;
     }
 
-
+    std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
 
 
     /////////////////////////////////////////////////////////////
@@ -589,6 +597,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     nodeInfos = nnodeInfos;
 
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
+
+    std::cout << "SORTED ASSERTIONS" << std::endl;
 
     // std::cout << "After sorting:" << std::endl;
     // for (size_t i = 0; i < nodeInfos.size(); i++)
@@ -621,7 +631,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         // std::cout << renamed << std::endl;
     }
 
-
+    std::cout << "RENAMED VARIABLES" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 5: Sort operands of commutative operators
@@ -632,12 +642,13 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos[i] = getNodeInfo(reordered);
     }
 
+    std::cout << "SORTED OPERANDS" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 6: Final sort within equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
 
-
+    std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
 
     ///////////////////////////////////////////////////////////
     // Step 5: Final renaming
