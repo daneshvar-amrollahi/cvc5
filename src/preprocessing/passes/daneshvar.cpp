@@ -70,30 +70,46 @@ struct NodeInfo
 {
     Node node;
     std::string encoding;
-    std::vector<int> varSeq;
+    std::vector<int> pat;
     std::vector<std::string> varNames; 
-    NodeInfo(Node n, std::string e, std::vector<int> vs, std::vector<std::string> vn) : node(n), encoding(e), varSeq(vs), varNames(vn) {}
+    std::map<std::string, int> role;
+    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r) : node(n), encoding(e), pat(p), varNames(vn), role(r) {}
 };
+
+int getRole(std::string var, NodeInfo n)
+{
+    if (n.role.find(var) != n.role.end())
+    {
+        return n.role[var];
+    }
+    return 0;
+}
 
 NodeInfo getNodeInfo(Node n)
 {
+    std::cout << "Constructing node info for " << n << std::endl;
+
     std::string encoding = "";
     std::vector<std::string> varNames; 
     dfs(n, encoding, varNames);
     encoding += "\n";
 
-    std::vector<int> varSeq;
+    std::vector<int> pat;
     std::map<std::string, int> varMap;
+    std::map<std::string, int> role;
     int id = 1;
     for (size_t i = 0; i < varNames.size(); ++i)
     {
         if (varMap.find(varNames[i]) == varMap.end())
         {
             varMap[varNames[i]] = id++;
+            role[varNames[i]] = varMap[varNames[i]];
+            std::cout << "Role of " << varNames[i] << " is " << role[varNames[i]] << std::endl;
         }
-        varSeq.push_back(varMap[varNames[i]]);
+        pat.push_back(varMap[varNames[i]]);
     }
-    return NodeInfo(n, encoding, varSeq, varNames);
+    std::cout << "---------------------------------" << std::endl;
+    return NodeInfo(n, encoding, pat, varNames, role);
 }
 
 
@@ -101,13 +117,13 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
 {
     if (a.encoding == b.encoding)
     {
-        AssertArgument(a.varSeq.size() == b.varSeq.size(), a.toString() + " and " + b.toString() + " have the same encoding but different variable sequence size");
-        size_t n = a.varSeq.size();
+        AssertArgument(a.pat.size() == b.pat.size(), a.toString() + " and " + b.toString() + " have the same encoding but different variable sequence size");
+        size_t n = a.pat.size();
         for (size_t i = 0; i < n; i++)
         {
-            if (a.varSeq[i] != b.varSeq[i])
+            if (a.pat[i] != b.pat[i])
             {
-                return a.varSeq[i] < b.varSeq[i];
+                return a.pat[i] < b.pat[i];
             }
         }
         // Now we have two alpha-equivalent nodes. Compare lexico-graphically
@@ -181,6 +197,12 @@ bool operandsCmpR1(const Node& a, const Node& b)
         sb = cvc5::internal::kind::toString(k);
     }
     return sa < sb;
+}
+
+bool complexCmp(const NodeInfo& a, const NodeInfo& b)
+{
+    // ToDo
+    return true;   
 }
 
 
@@ -445,26 +467,25 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(assertions[i]));
     }   
 
-    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp);
+    sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
 
     std::cout << "After sorting:" << std::endl;
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         std::cout << nodeInfos[i].node << std::endl;
         // std::cout << nodeInfos[i].encoding << std::endl;
-        // std::vector<int> varSeq = nodeInfos[i].varSeq;
-        // // for (size_t j = 0; j < varSeq.size(); j++)
+        // std::vector<int> pat = nodeInfos[i].pat;
+        // // for (size_t j = 0; j < pat.size(); j++)
         // // {
-        // //     std::cout << varSeq[j] << " ";
+        // //     std::cout << pat[j] << " ";
         // // }
         // std::cout << std::endl;
         // std::cout << "----" << std::endl;
     }
-
     std::cout << "---------------------------------" << std::endl;
 
     /////////////////////////////////////////////////////////////
-    // Step 4: Variable normalization
+    // Step 4: Variable normalization left ro right top to bottom
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
@@ -619,8 +640,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     assertionsToPreprocess->replace(i, flipped);
     // }
 
-
-    // exit(0);
     
 
   return PreprocessingPassResult::NO_CONFLICT;
