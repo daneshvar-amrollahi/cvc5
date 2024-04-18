@@ -739,23 +739,47 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::cout << "SORTED OPERANDS" << std::endl;
 
     /////////////////////////////////////////////////////////////
-    // Step 6: Final sort within equivalence classes
+    // Step 5.5: Final sort within equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
 
     std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
 
     ///////////////////////////////////////////////////////////
     // Step 5: Final renaming
-    // freeVar2node.clear();
-    // boundVar2node.clear();
-    // for (size_t i = 0; i < nodeInfos.size(); i++)
-    // {
-    //     // std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
-    //     Node renamed = rename(nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
-    //     // std::cout << "RENAMED " << std::endl << renamed << std::endl;
-    //     nodeInfos[i] = getNodeInfo(renamed);
-    //     // std::cout << "---------------------------------" << std::endl;
-    // }
+
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
+    freeVar2node.clear();
+    boundVar2node.clear();
+    for (size_t i = 0; i < prv_nodeInfos.size(); i++)
+    {
+        // std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
+        Node renamed = rename(prv_nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
+        // std::cout << "RENAMED " << std::endl << renamed << std::endl;
+        nodeInfos.push_back(getNodeInfo(renamed));
+        // std::cout << "---------------------------------" << std::endl;
+    }
+
+    
+
+    ///////////////////////////////////////////////////////////
+    // Step 6: sort operands of commutative operators
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
+    for (NodeInfo ni: prv_nodeInfos)
+    {
+        Node reordered = sortOp2(ni.node);
+        nodeInfos.push_back(getNodeInfo(reordered));
+    }
+
+
+    ///////////////////////////////////////////////////////////
+    // Step 7: Final sort within equivalence classes
+    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); //need to calculate new equivalent classes?
+
+
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
@@ -763,7 +787,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
         std::cout << nodeInfos[i].node << std::endl;
     }
 
-    abort();
+
+    // abort();
 
 
   return PreprocessingPassResult::NO_CONFLICT;
