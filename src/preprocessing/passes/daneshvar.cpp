@@ -211,7 +211,15 @@ bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
     {
         return sa < sb;
     }
-    // ToDo: Check the patterns in next equivalent classes
+    
+    for (size_t i = 0; i < nia.pat.size(); i++)
+    {
+        if (nia.pat[i] != nib.pat[i])
+        {
+            return nia.pat[i] < nib.pat[i];
+        }
+    }
+    // ToDo: super-pattern comparison
 
     return false;
 }
@@ -474,6 +482,21 @@ Node fixflips(Node n)
 }
 
 
+int numDigits(int n)
+{
+    if (n == 0)
+    {
+        return 1;
+    }
+    int count = 0;
+    while (n > 0)
+    {
+        n = n / 10;
+        count++;
+    }
+    return count;
+}
+
 Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
@@ -496,7 +519,14 @@ Node rename(
             else
             {
                 int id = boundVar2node.size() + 1;
-                Node ret = nodeManager->mkBoundVar("v" + std::to_string(id), n.getType());
+                std::string new_var_name = "v";
+                for (int i = 0; i < 5 - numDigits(id); i++)
+                {
+                    new_var_name += "0";
+                }
+                new_var_name += std::to_string(id);
+
+                Node ret = nodeManager->mkBoundVar(new_var_name, n.getType());
                 boundVar2node[n.toString()] = ret;
                 return ret;
             }
@@ -511,7 +541,13 @@ Node rename(
             {
                 std::vector<Node> cnodes;
                 int id = freeVar2node.size();
-                cnodes.push_back(nodeManager->mkConst(String("v" + std::to_string(id), false)));
+                std::string new_var_name = "v";
+                for (int i = 0; i < 5 - numDigits(id); i++)
+                {
+                    new_var_name += "0";
+                }
+                new_var_name += std::to_string(id);
+                cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
                 Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
                 cnodes.push_back(gt);
                 Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
