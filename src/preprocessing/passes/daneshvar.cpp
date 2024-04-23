@@ -824,19 +824,19 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
-    std::cout << "EC1" << std::endl;
-    std::cout << nodeInfos[0].encoding << std::endl;
+    // std::cout << "EC1" << std::endl;
+    // std::cout << nodeInfos[0].encoding << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
-            std::cout << "******" << std::endl;
-            std::cout << "EC" << ecId << std::endl;
+            // std::cout << "******" << std::endl;
+            // std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
-        std::cout << nodeInfos[i].encoding << std::endl;
+        // std::cout << nodeInfos[i].encoding << std::endl;
     }
 
     std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
@@ -849,19 +849,18 @@ PreprocessingPassResult Daneshvar::applyInternal(
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
 
-    std::cout << "SORTING OPERANDS OF COMMUTATIVE OPERATORS" << std::endl;
 
     for (NodeInfo ni: prv_nodeInfos)
     {
         // std::cout << "Resorting operands of " << ni.node << std::endl;
         // std::cout << ni.equivClassId << std::endl;
         Node curr = sortOp3(ni);
-        std::cout << curr << std::endl;
+        // std::cout << curr << std::endl;
         // std::cout << "\n";
         nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId));
     }
 
-
+    std::cout << "SORTED OPERANDS" << std::endl;
 
 
 
@@ -882,26 +881,26 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     std::cout << "SORTED ASSERTIONS" << std::endl;
 
-    for (size_t i = 0; i < nodeInfos.size(); i++)
-    {
-        std::cout << nodeInfos[i].node << std::endl;
-        std::cout << nodeInfos[i].encoding << std::endl;
-        std::vector<int> pat = nodeInfos[i].pat;
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+        // std::cout << nodeInfos[i].node << std::endl;
+        // std::cout << nodeInfos[i].encoding << std::endl;
+        // std::vector<int> pat = nodeInfos[i].pat;
         // for (size_t j = 0; j < pat.size(); j++)
         // {
         //     std::cout << pat[j] << " ";
         // }
-        std::cout << std::endl;
-        std::cout << "----" << std::endl;
-    }
-    std::cout << "---------------------------------" << std::endl;
+        // std::cout << std::endl;
+        // std::cout << "----" << std::endl;
+    // }
+    // std::cout << "---------------------------------" << std::endl;
 
-    std::cout << "BEFORE RENAMING" << std::endl;
-    for (size_t i = 0; i < nodeInfos.size(); i++)
-    {
-        std::cout << nodeInfos[i].node << std::endl;
-    }
-    std::cout << "---------------------------------" << std::endl;
+    // std::cout << "BEFORE RENAMING" << std::endl;
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+    //     std::cout << nodeInfos[i].node << std::endl;
+    // }
+    // std::cout << "---------------------------------" << std::endl;
 
     
 
@@ -928,12 +927,12 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(renamed));
     }
 
-    std::cout << "RENAMED VARIABLES" << std::endl;
+    // std::cout << "RENAMED VARIABLES" << std::endl;
 
-    for (size_t i = 0; i < nodeInfos.size(); i++)
-    {
-        std::cout << nodeInfos[i].node << std::endl;
-    }
+    // for (size_t i = 0; i < nodeInfos.size(); i++)
+    // {
+    //     std::cout << nodeInfos[i].node << std::endl;
+    // }
     // abort();
 
     /////////////////////////////////////////////////////////////
