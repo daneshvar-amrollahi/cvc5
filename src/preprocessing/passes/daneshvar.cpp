@@ -320,7 +320,6 @@ bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
             }
         }
 
-        std::cout << "Koon pare?\n";
 
     }
 
