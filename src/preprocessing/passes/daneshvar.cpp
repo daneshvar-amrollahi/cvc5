@@ -801,7 +801,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 2: Sort operands of commutative operators to fix structure
-    //ToDo: Add pattern check. If equal, look for super-pattern
 
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
@@ -843,6 +842,30 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
 
 
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 2.5: Now that you have equivalance classes, sort the operands of commutative operators again
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
+    std::cout << "SORTING OPERANDS OF COMMUTATIVE OPERATORS" << std::endl;
+
+    for (NodeInfo ni: prv_nodeInfos)
+    {
+        // std::cout << "Resorting operands of " << ni.node << std::endl;
+        // std::cout << ni.equivClassId << std::endl;
+        Node curr = sortOp3(ni);
+        std::cout << curr << std::endl;
+        // std::cout << "\n";
+        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId));
+    }
+
+
+
+
+
+
     /////////////////////////////////////////////////////////////
     // Step 3: Sort the assertions based on our super complex metric!
     
@@ -880,22 +903,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
     std::cout << "---------------------------------" << std::endl;
 
-    /////////////////////////////////////////////////////////////
-    // Step 3.5: Now that you have equivalance classes, sort the operands of commutative operators again
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
-
-    std::cout << "SORTING OPERANDS OF COMMUTATIVE OPERATORS" << std::endl;
-
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        // std::cout << "Resorting operands of " << ni.node << std::endl;
-        // std::cout << ni.equivClassId << std::endl;
-        Node curr = sortOp3(ni);
-        // std::cout << curr << std::endl;
-        // std::cout << "\n";
-        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId));
-    }
+    
 
 
 
