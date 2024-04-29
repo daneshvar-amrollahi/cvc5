@@ -364,6 +364,8 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         return a.equivClassId < b.equivClassId;
     }
 
+    std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
+
     // Calculate the super-pattern of a and b and compare them lexico-graphically
     int ecId = a.equivClassId; // also b.equivClassId
     std::vector<int> spat_a, spat_b;
@@ -393,6 +395,20 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
             }
         }
     }
+
+    std::cout << "Super-pattern(a): ";
+    for (size_t i = 0; i < spat_a.size(); i++)
+    {
+        std::cout << spat_a[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "Super-pattern(b):";
+    for (size_t i = 0; i < spat_b.size(); i++)
+    {
+        std::cout << spat_b[i] << " ";
+    }
+
+    std::cout << "\n*****" << std::endl;
 
     // Compare the super-patterns
     int n = spat_a.size();
@@ -823,19 +839,21 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
-    // std::cout << "EC1" << std::endl;
-    // std::cout << nodeInfos[0].encoding << std::endl;
+    std::cout << "EC1" << std::endl;
+    std::cout << nodeInfos[0].encoding;
+    std::cout << nodeInfos[0].node << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
-            // std::cout << "******" << std::endl;
-            // std::cout << "EC" << ecId << std::endl;
+            std::cout << "******" << std::endl;
+            std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
-        // std::cout << nodeInfos[i].encoding << std::endl;
+        std::cout << nodeInfos[i].encoding;
+        std::cout << nodeInfos[i].node << std::endl << std::endl;
     }
 
     std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
