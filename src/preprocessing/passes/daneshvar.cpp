@@ -364,6 +364,8 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         return a.equivClassId < b.equivClassId;
     }
 
+    std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
+
     // Calculate the super-pattern of a and b and compare them lexico-graphically
     int ecId = a.equivClassId; // also b.equivClassId
     std::vector<int> spat_a, spat_b;
@@ -375,7 +377,9 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         }
         std::string var_a = a.varNames[i], var_b = b.varNames[i]; // first different variables in a and b
         // Calculate super-pattern of var_a and var_b in next equivalent classes
-        for (int j = ecId + 1; ec[j].size() > 0; ++j)
+        spat_a.clear();
+        spat_b.clear();
+        for (int j = ecId; ec[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
             for (NodeInfo curr : ec[j])
@@ -383,10 +387,25 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
             }
+
+            std::cout << "j=" << j << std::endl;
+            std::cout << "pat_a: ";
+            for (size_t k = 0; k < pat_j_a.size(); k++)
+            {
+                std::cout << pat_j_a[k] << " ";
+            }
+            std::cout << std::endl;
+            std::cout << "pat_b: ";
+            for (size_t k = 0; k < pat_j_b.size(); k++)
+            {
+                std::cout << pat_j_b[k] << " ";
+            }
+            std::cout << std::endl;
+
             sort(pat_j_a.begin(), pat_j_a.end());
             sort(pat_j_b.begin(), pat_j_b.end());
             // Append pattern of var_a in ec[j] to spat_a
-            for (int k = 0; k < pat_j_a.size(); k++)
+            for (size_t k = 0; k < pat_j_a.size(); k++)
             {
                 spat_a.push_back(pat_j_a[k]);
                 spat_b.push_back(pat_j_b[k]);
@@ -395,14 +414,27 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
     }
 
     // Compare the super-patterns
-    int n = spat_a.size();
-    for (int i = 0; i < n; i++)
+    size_t n = spat_a.size();
+    for (size_t i = 0; i < n; i++)
     {
         if (spat_a[i] != spat_b[i])
         {
             return spat_a[i] < spat_b[i];
         }
     }
+
+    std::cout << "Super-patterns are the same for " << a.node << " and " << b.node << std::endl;
+    for (size_t i = 0; i < spat_a.size(); i++)
+    {
+        std::cout << spat_a[i] << " ";
+    }
+    std::cout << std::endl;
+    for (size_t i = 0; i < spat_b.size(); i++)
+    {
+        std::cout << spat_b[i] << " ";
+    }
+    std::cout << std::endl;
+
     // We don't care at this point. But apparently we should :')
     return false;   
 }
@@ -823,19 +855,20 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
-    // std::cout << "EC1" << std::endl;
-    // std::cout << nodeInfos[0].encoding << std::endl;
+    std::cout << "EC1" << std::endl;
+    std::cout << nodeInfos[0].node << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
-            // std::cout << "******" << std::endl;
-            // std::cout << "EC" << ecId << std::endl;
+            std::cout << "******" << std::endl;
+            std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
         // std::cout << nodeInfos[i].encoding << std::endl;
+        std::cout << nodeInfos[i].node << std::endl;
     }
 
     std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
@@ -876,9 +909,18 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId));
     }
 
+
+    // ToDo: Recompute equivalence classes?
+
+
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
 
     std::cout << "SORTED ASSERTIONS" << std::endl;
+
+    for (NodeInfo ni: nodeInfos)
+    {
+        std::cout << ni.node << std::endl;
+    }
 
     // for (size_t i = 0; i < nodeInfos.size(); i++)
     // {
