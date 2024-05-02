@@ -364,7 +364,7 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         return a.equivClassId < b.equivClassId;
     }
 
-    std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
+    // std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
 
     // Calculate the super-pattern of a and b and compare them lexico-graphically
     int ecId = a.equivClassId; // also b.equivClassId
@@ -388,19 +388,19 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
                 pat_j_b.push_back(getRole(var_b, curr));
             }
 
-            std::cout << "j=" << j << std::endl;
-            std::cout << "pat_a: ";
-            for (size_t k = 0; k < pat_j_a.size(); k++)
-            {
-                std::cout << pat_j_a[k] << " ";
-            }
-            std::cout << std::endl;
-            std::cout << "pat_b: ";
-            for (size_t k = 0; k < pat_j_b.size(); k++)
-            {
-                std::cout << pat_j_b[k] << " ";
-            }
-            std::cout << std::endl;
+            // std::cout << "j=" << j << std::endl;
+            // std::cout << "pat_a: ";
+            // for (size_t k = 0; k < pat_j_a.size(); k++)
+            // {
+            //     std::cout << pat_j_a[k] << " ";
+            // }
+            // std::cout << std::endl;
+            // std::cout << "pat_b: ";
+            // for (size_t k = 0; k < pat_j_b.size(); k++)
+            // {
+            //     std::cout << pat_j_b[k] << " ";
+            // }
+            // std::cout << std::endl;
 
             sort(pat_j_a.begin(), pat_j_a.end());
             sort(pat_j_b.begin(), pat_j_b.end());
@@ -423,17 +423,17 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         }
     }
 
-    std::cout << "Super-patterns are the same for " << a.node << " and " << b.node << std::endl;
-    for (size_t i = 0; i < spat_a.size(); i++)
-    {
-        std::cout << spat_a[i] << " ";
-    }
-    std::cout << std::endl;
-    for (size_t i = 0; i < spat_b.size(); i++)
-    {
-        std::cout << spat_b[i] << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "Super-patterns are the same for " << a.node << " and " << b.node << std::endl;
+    // for (size_t i = 0; i < spat_a.size(); i++)
+    // {
+    //     std::cout << spat_a[i] << " ";
+    // }
+    // std::cout << std::endl;
+    // for (size_t i = 0; i < spat_b.size(); i++)
+    // {
+    //     std::cout << spat_b[i] << " ";
+    // }
+    // std::cout << std::endl;
 
     // We don't care at this point. But apparently we should :')
     return false;   
@@ -822,7 +822,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(curr));
     }
 
-    std::cout << "FIXED FLIPS" << std::endl;
+    // std::cout << "FIXED FLIPS" << std::endl;
 
     // std::cout << "After fix flips:" << std::endl;
     // for (size_t i = 0; i < assertions.size(); ++i)
@@ -842,7 +842,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(curr));
     }
 
-    std::cout << "SORTED OPERANDS" << std::endl;
+    // std::cout << "SORTED OPERANDS" << std::endl;
 
 
     /////////////////////////////////////////////////////////////
@@ -855,23 +855,23 @@ PreprocessingPassResult Daneshvar::applyInternal(
     unsigned ecId = 1;
     nodeInfos[0].equivClassId = ecId;
     ec[ecId].push_back(nodeInfos[0]);
-    std::cout << "EC1" << std::endl;
-    std::cout << nodeInfos[0].node << std::endl;
+    // std::cout << "EC1" << std::endl;
+    // std::cout << nodeInfos[0].node << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
             ecId++;
-            std::cout << "******" << std::endl;
-            std::cout << "EC" << ecId << std::endl;
+            // std::cout << "******" << std::endl;
+            // std::cout << "EC" << ecId << std::endl;
         }
         nodeInfos[i].equivClassId = ecId;
         ec[ecId].push_back(nodeInfos[i]);
         // std::cout << nodeInfos[i].encoding << std::endl;
-        std::cout << nodeInfos[i].node << std::endl;
+        // std::cout << nodeInfos[i].node << std::endl;
     }
 
-    std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
+    // std::cout << "CALCULATED EQUIVALENCE CLASSES" << std::endl;
 
 
 
@@ -892,7 +892,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId));
     }
 
-    std::cout << "SORTED OPERANDS" << std::endl;
+    // std::cout << "SORTED OPERANDS" << std::endl;
 
 
 
@@ -915,12 +915,12 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
 
-    std::cout << "SORTED ASSERTIONS" << std::endl;
+    // std::cout << "SORTED ASSERTIONS" << std::endl;
 
-    for (NodeInfo ni: nodeInfos)
-    {
-        std::cout << ni.node << std::endl;
-    }
+    // for (NodeInfo ni: nodeInfos)
+    // {
+    //     std::cout << ni.node << std::endl;
+    // }
 
     // for (size_t i = 0; i < nodeInfos.size(); i++)
     // {
@@ -988,13 +988,13 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
 
-    std::cout << "SORTED OPERANDS" << std::endl;
+    // std::cout << "SORTED OPERANDS" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 5.5: Final sort within equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
 
-    std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
+    // std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
 
     ///////////////////////////////////////////////////////////
     // Step 5: Final renaming
@@ -1029,7 +1029,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     ///////////////////////////////////////////////////////////
     // Step 7: Final sort within equivalence classes
-    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); //need to calculate new equivalent classes?
+    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); //need to re-calculate new equivalent classes?
 
 
 
