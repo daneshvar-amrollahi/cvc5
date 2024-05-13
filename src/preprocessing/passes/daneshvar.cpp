@@ -214,7 +214,11 @@ bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
     {
         return sa < sb;
     }
-    
+    if (nia.encoding != nib.encoding)
+    {
+        return nia.encoding < nib.encoding;
+    } 
+    AssertArgument(nia.pat.size() == nib.pat.size(), nia.toString() + " and " + nib.toString() + " have the same encoding but different variable sequence size");
     for (size_t i = 0; i < nia.pat.size(); i++)
     {
         if (nia.pat[i] != nib.pat[i])
