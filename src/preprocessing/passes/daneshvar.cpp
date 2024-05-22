@@ -80,9 +80,10 @@ struct NodeInfo
     }
     NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId_ass, unsigned ecId_op) : 
         node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId_ass(ecId_ass), equivClassId_operands(ecId_op) {}
-} currAssertion;
+};
 
 std::map<int, std::vector<NodeInfo>> ec_ass;
+std::map<int, std::vector<NodeInfo>> ec_oper;
 
 int getRole(std::string var, NodeInfo n)
 {
@@ -95,8 +96,6 @@ int getRole(std::string var, NodeInfo n)
 
 NodeInfo getNodeInfo(Node n, unsigned ecId_ass, unsigned ecId_op)
 {
-    // std::cout << "Constructing node info for " << n << std::endl;
-
     std::string encoding = "";
     std::vector<std::string> varNames; 
     dfs(n, encoding, varNames);
@@ -182,6 +181,7 @@ bool operandsCmpR2(const Node& a, const Node& b)
 
 bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 {
+    std::cout << "Comparing " << nia.node << " and " << nib.node << std::endl;
     Node a = nia.node, b = nib.node;
     // std::string sa, sb;
     // if (a.isVar())
@@ -227,6 +227,52 @@ bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
             return nia.pat[i] < nib.pat[i];
         }
     }
+
+
+    // Now we know that they belong to the same equivalent class
+    AssertArgument(nia.equivClassId_operands == nib.equivClassId_operands, nia.toString() + " and " + nib.toString() + " have the same encoding and pattern but different equivalent class id for operands");
+
+    // Calculate super-pattern of diff pairs of variables in the next equivalent classes and compare them
+    for (int i = 0; i < nia.varNames.size(); ++i)
+    {
+        if (nia.varNames[i] == nib.varNames[i])
+        {
+            continue;
+        }
+        std::string var_a = nia.varNames[i], var_b = nib.varNames[i]; // first different variables in a and b
+        
+        int ecId_operands = nia.equivClassId_operands; // = b.equivClassId_operands
+        std::vector<int> spat_a, spat_b;
+        for (int j = ecId_operands; ec_oper[j].size() > 0; ++j)
+        {
+            std::vector<int> pat_j_a, pat_j_b;
+            for (NodeInfo curr : ec_oper[j])
+            {
+                pat_j_a.push_back(getRole(var_a, curr));
+                pat_j_b.push_back(getRole(var_b, curr));
+            }
+            sort(pat_j_a.begin(), pat_j_a.end());
+            sort(pat_j_b.begin(), pat_j_b.end());
+            // Append pattern of var_a in ec_oper[j] to spat_a
+            for (size_t k = 0; k < pat_j_a.size(); k++)
+            {
+                spat_a.push_back(pat_j_a[k]);
+                spat_b.push_back(pat_j_b[k]);
+            }
+        }
+
+        // Compare the super-patterns
+        size_t n = spat_a.size();
+        for (size_t j = 0; j < n; j++)
+        {
+            if (spat_a[j] != spat_b[j])
+            {
+                return spat_a[j] < spat_b[j];
+            }
+        }
+    }
+
+
     return false;
 }
 
@@ -236,40 +282,11 @@ bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
 {
     Node a = nia.node, b = nib.node;
-    std::string sa, sb;
-    if (a.isVar())
+    if (nia.encoding != nib.encoding)
     {
-        sa = "V";
+        return nia.encoding < nib.encoding;
     }
-    else if (a.isConst())
-    {
-        sa = a.toString();
-    }
-    else
-    {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
-        sa = cvc5::internal::kind::toString(k);
-    }
-
-    if (b.isVar())
-    {
-        sb = "V";
-    } 
-    else if (b.isConst())
-    {
-        sb = b.toString();
-    }
-    else
-    {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
-        sb = cvc5::internal::kind::toString(k);
-    }
-    if (sa != sb)
-    {
-        return sa < sb;
-    }
-    
-    // For variables, the pattern is a seq with the single element 1
+    AssertArgument(nia.pat.size() == nib.pat.size(), nia.toString() + " and " + nib.toString() + " have the same encoding but different variable sequence size");
     for (size_t i = 0; i < nia.pat.size(); i++)
     {
         if (nia.pat[i] != nib.pat[i])
@@ -277,15 +294,67 @@ bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
             return nia.pat[i] < nib.pat[i];
         }
     }
-    // ToDo: super-pattern comparison if both are variables
 
-    if (a.isVar() && b.isVar())
+    // Now we know that they belong to the same equivalent class
+    AssertArgument(nia.equivClassId_operands == nib.equivClassId_operands, nia.toString() + " and " + nib.toString() + " have the same encoding and pattern but different equivalent class id for operands");
+
+    // Calculate super-pattern of diff pairs of variables in the next equivalent classes of OPERANDS and compare them
+
+    for (int i = 0; i < nia.varNames.size(); ++i)
     {
-        // std::cout << "Calculating super-pattern for " << a << " and " << b << std::endl;
-        int ecId_ass = nia.equivClassId_ass; // also b.equivClassId_ass
+        if (nia.varNames[i] == nib.varNames[i])
+        {
+            continue;
+        }
+        std::string var_a = nia.varNames[i], var_b = nib.varNames[i]; // first different variables in a and b
+        
+        int ecId_oper = nia.equivClassId_operands; // = b.equivClassId_operands
         std::vector<int> spat_a, spat_b;
-        std::string var_a = a.toString(), var_b = b.toString();
-        // std::cout << "j=" << ecId_ass << " " << ec_ass[ecId_ass].size() << std::endl;
+        for (int j = ecId_oper; ec_oper[j].size() > 0; ++j)
+        {
+            std::vector<int> pat_j_a, pat_j_b;
+            for (NodeInfo curr : ec_oper[j])
+            {
+                pat_j_a.push_back(getRole(var_a, curr));
+                pat_j_b.push_back(getRole(var_b, curr));
+            }
+            sort(pat_j_a.begin(), pat_j_a.end());
+            sort(pat_j_b.begin(), pat_j_b.end());
+            // Append pattern of var_a in ec_oper[j] to spat_a
+            for (size_t k = 0; k < pat_j_a.size(); k++)
+            {
+                spat_a.push_back(pat_j_a[k]);
+                spat_b.push_back(pat_j_b[k]);
+            }
+        }
+
+        // Compare the super-patterns
+        size_t n = spat_a.size();
+        for (size_t j = 0; j < n; j++)
+        {
+            if (spat_a[j] != spat_b[j])
+            {
+                return spat_a[j] < spat_b[j];
+            }
+        }
+    }
+
+
+
+
+    // Calculate super-pattern of diff pairs of variables in the next equivalent classes of ASSERTIONS and compare them
+    
+
+    for (int i = 0; i < nia.varNames.size(); ++i)
+    {
+        if (nia.varNames[i] == nib.varNames[i])
+        {
+            continue;
+        }
+        std::string var_a = nia.varNames[i], var_b = nib.varNames[i]; // first different variables in a and b
+
+        int ecId_ass = nia.equivClassId_ass; // = b.equivClassId_ass
+        std::vector<int> spat_a, spat_b;
         for (int j = ecId_ass; ec_ass[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
@@ -294,37 +363,23 @@ bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
             }
-            sort(pat_j_a.begin(), pat_j_a.end()); // ToDo: Do we need to sorts?
+            sort(pat_j_a.begin(), pat_j_a.end());
             sort(pat_j_b.begin(), pat_j_b.end());
             // Append pattern of var_a in ec_ass[j] to spat_a
-            for (int k = 0; k < pat_j_a.size(); k++)
+            for (size_t k = 0; k < pat_j_a.size(); k++)
             {
                 spat_a.push_back(pat_j_a[k]);
                 spat_b.push_back(pat_j_b[k]);
             }
         }
 
-        // std::cout << "Super-pattern of " << a << " is ";
-        // for (size_t i = 0; i < spat_a.size(); i++)
-        // {
-        //     std::cout << spat_a[i] << " ";
-        // }
-        // std::cout << std::endl;
-        // std::cout << "Super-pattern of " << b << " is ";
-        // for (size_t i = 0; i < spat_b.size(); i++)
-        // {
-        //     std::cout << spat_b[i] << " ";
-        // }
-        // std::cout << std::endl;
-        // std::cout << "*****" << std::endl;
-
         // Compare the super-patterns
-        int n = spat_a.size();
-        for (int i = 0; i < n; i++)
+        size_t n = spat_a.size();
+        for (size_t j = 0; j < n; j++)
         {
-            if (spat_a[i] != spat_b[i])
+            if (spat_a[j] != spat_b[j])
             {
-                return spat_a[i] < spat_b[i];
+                return spat_a[j] < spat_b[j];
             }
         }
 
@@ -353,7 +408,7 @@ bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
             return a.pat[i] < b.pat[i];
         }
     }
-    // We don't care at this point :)
+    
     return false;
 }
 
@@ -364,9 +419,10 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         return a.equivClassId_ass < b.equivClassId_ass;
     }
 
-    // std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
 
-    // Calculate the super-pattern of a and b and compare them lexico-graphically
+    // a and b belong to the same class
+
+    // Calculate super-pattern of diff pairs of variables in the next equivalent classes and compare them
     int ecId_ass = a.equivClassId_ass; // also b.equivClassId_ass
     std::vector<int> spat_a, spat_b;
     for (int i = 0; i < a.varNames.size(); ++i)
@@ -435,23 +491,10 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
     // }
     // std::cout << std::endl;
 
-    // We don't care at this point. But apparently we should :')
+    // What happens here?
     return false;   
 }
 
-
-std::pair<std::string, std::string> getFirstDiffVars(const std::vector<std::string> &a, const std::vector<std::string> &b)
-{
-    int n = std::min(a.size(), b.size());
-    for (int i = 0; i < n; i++)
-    {
-        if (a[i] != b[i])
-        {
-            return std::make_pair(a[i], b[i]);
-        }
-    }
-    return std::make_pair("", "");
-}
 
 
 // Return vector index >= 0 (from where the list of children is commutative)
@@ -497,6 +540,23 @@ int isCommutative(cvc5::internal::Kind k)
     return -1;
 }
 
+bool sameClass(NodeInfo a, NodeInfo b)
+{
+    if (a.encoding != b.encoding)
+    {
+        return false;
+    }
+    int n = a.pat.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (a.pat[i] != b.pat[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 Node sortOp1(NodeInfo ni)
 {
@@ -513,26 +573,28 @@ Node sortOp1(NodeInfo ni)
     int commutative = isCommutative(n.getKind());
 
 
-
     if (commutative != -1)
     {
+
         // Calculate equivalence classes for the children (operands)
-        std::map<int, std::vector<NodeInfo>> ec_operands;
+        ec_oper.clear();
+        std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
 
-
+        int ecId_operands = 1;
+        child[commutative].equivClassId_operands = ecId_operands;
+        ec_oper[ecId_operands].push_back(child[commutative]);
+        for (size_t i = commutative + 1; i < child.size(); i++)
+        {
+            if (!sameClass(child[i], child[i - 1]))
+            {
+                ecId_operands++;
+            }
+            child[i].equivClassId_operands = ecId_operands;
+            ec_oper[ecId_operands].push_back(child[i]);
+        }
     }
 
 
-
-    if (commutative == 0)
-    {
-        // std::cout << "Sorting " << n << std::endl;
-        std::sort(child.begin(), child.end(), operandsCmpR1);
-
-    } else if (commutative == 1)
-    {
-        std::sort(child.begin() + 1, child.end(), operandsCmpR1);
-    }
 
     std::vector<Node> operands;
     for (size_t i = 0; i < child.size(); i++)
@@ -549,42 +611,6 @@ Node sortOp1(NodeInfo ni)
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
 }
 
-
-Node sortOp2(Node n)
-{
-    // std::cout << "Sort op called for " << n << std::endl;
-    if (n.isVar() || n.isConst())
-    {
-        // std::cout << "Returning " << n << std::endl;
-        return n;
-    }
-    std::vector<Node> operands;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        // std::cout << "Child " << i << " of " << n << " is " << n[i] << std::endl;
-        operands.push_back(sortOp2(n[i]));
-    } 
-    int commutative = isCommutative(n.getKind());
-
-
-    if (commutative == 0)
-    {
-        // std::cout << "Sorting " << n << std::endl;
-        std::sort(operands.begin(), operands.end(), operandsCmpR2);
-
-    } else if (commutative == 1)
-    {
-        std::sort(operands.begin() + 1, operands.end(), operandsCmpR2);
-    }
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        operands.insert(operands.begin(), n.getOperator());
-    }
-
-
-    return NodeManager::currentNM()->mkNode(n.getKind(), operands);
-}
 
 
 Node sortOp3(NodeInfo ni)
@@ -600,20 +626,32 @@ Node sortOp3(NodeInfo ni)
         int ecId_ass = ni.equivClassId_ass;
         NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
         child.push_back(getNodeInfo(sortOp3(curr), ecId_ass, -1));
-        // child.push_back(getNodeInfo(sortOp3(getNodeInfo(n[i]))));
     } 
     int commutative = isCommutative(n.getKind());
 
 
-    if (commutative == 0)
+      
+    if (commutative != -1)
     {
-        // std::cout << "std::sorting " << n << std::endl;
-        std::sort(child.begin(), child.end(), operandsCmpR3);
+        // Calculate equivalence classes for the children (operands)
+        ec_oper.clear();
+        std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
 
-    } else if (commutative == 1)
-    {
-        std::sort(child.begin() + 1, child.end(), operandsCmpR3);
+        int ecId_operands = 1;
+        child[commutative].equivClassId_operands = ecId_operands;
+        ec_oper[ecId_operands].push_back(child[commutative]);
+        for (size_t i = commutative + 1; i < child.size(); i++)
+        {
+            if (!sameClass(child[i], child[i - 1]))
+            {
+                ecId_operands++;
+            }
+            child[i].equivClassId_operands = ecId_operands;
+            ec_oper[ecId_operands].push_back(child[i]);
+        }
     }
+
+
 
     std::vector<Node> operands;
     for (size_t i = 0; i < child.size(); i++)
@@ -628,102 +666,8 @@ Node sortOp3(NodeInfo ni)
 
 
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
+
 }
-
-
-bool oneHotCmp(const NodeInfo& nia, const NodeInfo& nib)
-{
-    if (nia.encoding != nib.encoding)
-    {
-        return nia.encoding < nib.encoding;
-    }
-
-    
-    std::vector<std::string> varNames_a = nia.varNames, varNames_b = nib.varNames;
-    std::pair<std::string, std::string> diffVars = getFirstDiffVars(varNames_a, varNames_b);
-    if (diffVars.first == "" && diffVars.second == "") // Totally the same
-    {
-        return false;
-    }
-
-
-    std::vector<bool> onehot_a, onehot_b;
-    std::string var_a = diffVars.first, var_b = diffVars.second;
-    for (size_t i = 0; i < currAssertion.varNames.size(); i++)
-    {
-        if (currAssertion.varNames[i] == var_a)
-        {
-            onehot_a.push_back(true);
-        }
-        else
-        {
-            onehot_a.push_back(false);
-        }
-        if (currAssertion.varNames[i] == var_b)
-        {
-            onehot_b.push_back(true);
-        }
-        else
-        {
-            onehot_b.push_back(false);
-        }
-    }
-
-    // Compare the one-hot encodings
-    size_t n = onehot_a.size();
-    for (size_t i = 0; i < n; i++)
-    {
-        if (onehot_a[i] != onehot_b[i])
-        {
-            return onehot_a[i] < onehot_b[i];
-        }
-    }
-    
-    AssertArgument(false, "One Hot Encodings can't be the same for " + var_a + " and " + var_b + " in " + currAssertion.node.toString() + " and " + nia.node.toString() + " and " + nib.node.toString());
-}
-
-
-Node oneHotReorder(NodeInfo ni)
-{
-    Node n = ni.node;
-    if (n.isVar() || n.isConst())
-    {
-        return n;
-    }
-    std::vector<NodeInfo> child;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        int ecId_ass = ni.equivClassId_ass;
-        NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
-        child.push_back(getNodeInfo(oneHotReorder(curr), ecId_ass, -1));
-    } 
-    int commutative = isCommutative(n.getKind());
-
-
-    if (commutative == 0)
-    {
-        std::sort(child.begin(), child.end(), oneHotCmp);
-
-    } else if (commutative == 1)
-    {
-        std::sort(child.begin() + 1, child.end(), oneHotCmp);
-    }
-
-    std::vector<Node> operands;
-    for (size_t i = 0; i < child.size(); i++)
-    {
-        operands.push_back(child[i].node);
-    }
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        operands.insert(operands.begin(), n.getOperator());
-    }
-
-
-    return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
-}
-
 
 
 
@@ -888,22 +832,7 @@ Node rename(
 }
 
 
-bool sameClass(NodeInfo a, NodeInfo b)
-{
-    if (a.encoding != b.encoding)
-    {
-        return false;
-    }
-    int n = a.pat.size();
-    for (int i = 0; i < n; i++)
-    {
-        if (a.pat[i] != b.pat[i])
-        {
-            return false;
-        }
-    }
-    return true;
-}
+
 
 
 PreprocessingPassResult Daneshvar::applyInternal(
@@ -923,14 +852,14 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node curr = fixflips(assertion);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    // std::cout << "FIXED FLIPS" << std::endl;
+    std::cout << "FIXED FLIPS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
 
 
     /////////////////////////////////////////////////////////////
-    // Step 2: Sort operands of commutative operators to fix structure
+    // Step 2: Sort operands of commutative operators using 1. encoding 2. pattern 3. super-patterns
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
 
@@ -939,37 +868,26 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node curr = sortOp1(ni);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    // std::cout << "SORTED OPERANDS" << std::endl;
-    /////////////////////////////////////////////////////////////
-
-
-
-     /////////////////////////////////////////////////////////////
-    // Step 3: Re-order operands of commutative operators within each assertion
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        currAssertion = ni;
-        Node reordered = oneHotReorder(ni);
-        nodeInfos.push_back(getNodeInfo(reordered, -1, -1));
-    }
+    std::cout << "SORTED OPERANDS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
 
     /////////////////////////////////////////////////////////////    
-    // Step 4: Sort based on encoding and pattern to calculate equivalence classes
+    // Step 3: Sort based on encoding and pattern to calculate equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); 
-    // std::cout << "SORTED BASED ON ENCODING" << std::endl;
+    std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
 
 
 
+
+
+
     /////////////////////////////////////////////////////////////
-    // Step 5: Calculate equivalence classes
+    // Step 4: Calculate equivalence classes for assertions
     unsigned ecId_ass = 1;
     nodeInfos[0].equivClassId_ass = ecId_ass;
     ec_ass[ecId_ass].push_back(nodeInfos[0]);
@@ -992,35 +910,17 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////
 
 
-    /*
-    /////////////////////////////////////////////////////////////
-    // Step 2.5: Now that you have equivalance classes, sort the operands of commutative operators again
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
 
-
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        // std::cout << "Resorting operands of " << ni.node << std::endl;
-        // std::cout << ni.equivClassId_ass << std::endl;
-        Node curr = sortOp3(ni);
-        // std::cout << curr << std::endl;
-        // std::cout << "\n";
-        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId_ass));
-    }
-
-    // std::cout << "SORTED OPERANDS" << std::endl;
-    */
 
 
 
     /////////////////////////////////////////////////////////////
-    // Step 6: Sort the assertions based on our super complex metric!
+    // Step 5: Sort the assertions based on our super complex metric!
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass, ni.equivClassId_operands));
+        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass, -1));
     }
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
     // std::cout << "SORTED ASSERTIONS" << std::endl;
@@ -1030,33 +930,19 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-    // for (NodeInfo ni: nodeInfos)
-    // {
-    //     std::cout << ni.node << std::endl;
-    // }
 
-    // for (size_t i = 0; i < nodeInfos.size(); i++)
-    // {
-        // std::cout << nodeInfos[i].node << std::endl;
-        // std::cout << nodeInfos[i].encoding << std::endl;
-        // std::vector<int> pat = nodeInfos[i].pat;
-        // for (size_t j = 0; j < pat.size(); j++)
-        // {
-        //     std::cout << pat[j] << " ";
-        // }
-        // std::cout << std::endl;
-        // std::cout << "----" << std::endl;
-    // }
-    // std::cout << "---------------------------------" << std::endl;
 
-    // std::cout << "BEFORE RENAMING" << std::endl;
-    // for (size_t i = 0; i < nodeInfos.size(); i++)
-    // {
-    //     std::cout << nodeInfos[i].node << std::endl;
-    // }
-    // std::cout << "---------------------------------" << std::endl;
+    /////////////////////////////////////////////////////////////
+    // Step 6: Sort the operands once again
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+    for (NodeInfo ni: prv_nodeInfos)
+    {
+        Node curr = sortOp3(ni);
+        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId_ass, -1));
+    }
+    /////////////////////////////////////////////////////////////
 
-    
 
 
 
@@ -1082,22 +968,11 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-    /*
-    // Step 5: Sort operands of commutative operators using new names
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        Node reordered = sortOp2(ni.node);
-        nodeInfos.push_back(getNodeInfo(reordered));
-    }
-    // std::cout << "SORTED OPERANDS" << std::endl;
-    */
 
 
     /////////////////////////////////////////////////////////////
-    // Step 5.5: Final sort with new names
-    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
+    // Step 8: Final sort with new names. NEEDED?
+    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
     // std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
     ///////////////////////////////////////////////////////////
 
@@ -1121,24 +996,10 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     // std::cout << "---------------------------------" << std::endl;
     // }
 
-    
-
-    ///////////////////////////////////////////////////////////
-    // Step 6: sort operands of commutative operators
-    // prv_nodeInfos = nodeInfos;
-    // nodeInfos.clear();
-
-    // for (NodeInfo ni: prv_nodeInfos)
-    // {
-    //     Node reordered = sortOp2(ni.node);
-    //     nodeInfos.push_back(getNodeInfo(reordered));
-    // }
-    ///////////////////////////////////////////////////////////
-
-    
-    // Step 7: Final sort within equivalence classes
-    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); //need to re-calculate new equivalent classes?
     */
+
+
+    
 
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
