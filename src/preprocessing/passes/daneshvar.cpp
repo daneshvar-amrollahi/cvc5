@@ -592,6 +592,21 @@ Node sortOp1(NodeInfo ni)
             child[i].equivClassId_operands = ecId_operands;
             ec_oper[ecId_operands].push_back(child[i]);
         }
+
+        // std::cout << "Sorting operands of " << n << std::endl;
+        // Print equivalence classes
+        // for (auto it = ec_oper.begin(); it != ec_oper.end(); ++it)
+        // {
+        //     std::cout << "EC" << it->first << std::endl;
+        //     for (NodeInfo curr : it->second)
+        //     {
+        //         std::cout << curr.node << std::endl;
+        //     }
+        //     std::cout << "----------------" << std::endl;
+        // }
+
+        std::sort(child.begin(), child.begin() + commutative, operandsCmpR1);
+
     }
 
 
@@ -649,6 +664,8 @@ Node sortOp3(NodeInfo ni)
             child[i].equivClassId_operands = ecId_operands;
             ec_oper[ecId_operands].push_back(child[i]);
         }
+
+        std::sort(child.begin() + commutative, child.end(), operandsCmpR3);
     }
 
 
