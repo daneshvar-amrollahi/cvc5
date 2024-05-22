@@ -74,11 +74,12 @@ struct NodeInfo
     std::vector<std::string> varNames; 
     std::map<std::string, int> role;
     unsigned equivClassId_ass;
+    unsigned equivClassId_operands; 
     NodeInfo() {
         
     }
-    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId_ass) : 
-        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId_ass(ecId_ass) {}
+    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId_ass, unsigned ecId_op) : 
+        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId_ass(ecId_ass), equivClassId_operands(ecId_op) {}
 } currAssertion;
 
 std::map<int, std::vector<NodeInfo>> ec_ass;
@@ -92,7 +93,7 @@ int getRole(std::string var, NodeInfo n)
     return 0;
 }
 
-NodeInfo getNodeInfo(Node n, unsigned ecId_ass = 0)
+NodeInfo getNodeInfo(Node n, unsigned ecId_ass, unsigned ecId_op)
 {
     // std::cout << "Constructing node info for " << n << std::endl;
 
@@ -116,7 +117,7 @@ NodeInfo getNodeInfo(Node n, unsigned ecId_ass = 0)
         pat.push_back(varMap[varNames[i]]);
     }
     // std::cout << "---------------------------------" << std::endl;
-    return NodeInfo(n, encoding, pat, varNames, role, ecId_ass);
+    return NodeInfo(n, encoding, pat, varNames, role, ecId_ass, ecId_op);
 }
 
 
@@ -182,38 +183,38 @@ bool operandsCmpR2(const Node& a, const Node& b)
 bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 {
     Node a = nia.node, b = nib.node;
-    std::string sa, sb;
-    if (a.isVar())
-    {
-        sa = "V";
-    }
-    else if (a.isConst())
-    {
-        sa = a.toString();
-    }
-    else
-    {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
-        sa = cvc5::internal::kind::toString(k);
-    }
+    // std::string sa, sb;
+    // if (a.isVar())
+    // {
+    //     sa = "V";
+    // }
+    // else if (a.isConst())
+    // {
+    //     sa = a.toString();
+    // }
+    // else
+    // {
+    //     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
+    //     sa = cvc5::internal::kind::toString(k);
+    // }
 
-    if (b.isVar())
-    {
-        sb = "V";
-    } 
-    else if (b.isConst())
-    {
-        sb = b.toString();
-    }
-    else
-    {
-        cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
-        sb = cvc5::internal::kind::toString(k);
-    }
-    if (sa != sb)
-    {
-        return sa < sb;
-    }
+    // if (b.isVar())
+    // {
+    //     sb = "V";
+    // } 
+    // else if (b.isConst())
+    // {
+    //     sb = b.toString();
+    // }
+    // else
+    // {
+    //     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
+    //     sb = cvc5::internal::kind::toString(k);
+    // }
+    // if (sa != sb)
+    // {
+    //     return sa < sb;
+    // }
     if (nia.encoding != nib.encoding)
     {
         return nia.encoding < nib.encoding;
@@ -507,7 +508,7 @@ Node sortOp1(NodeInfo ni)
     std::vector<NodeInfo> child;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        child.push_back(getNodeInfo(sortOp1(getNodeInfo(n[i]))));
+        child.push_back(getNodeInfo(sortOp1(getNodeInfo(n[i], -1, -1)), -1, -1));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -597,8 +598,8 @@ Node sortOp3(NodeInfo ni)
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         int ecId_ass = ni.equivClassId_ass;
-        NodeInfo curr = getNodeInfo(n[i], ecId_ass);
-        child.push_back(getNodeInfo(sortOp3(curr), ecId_ass));
+        NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
+        child.push_back(getNodeInfo(sortOp3(curr), ecId_ass, -1));
         // child.push_back(getNodeInfo(sortOp3(getNodeInfo(n[i]))));
     } 
     int commutative = isCommutative(n.getKind());
@@ -693,8 +694,8 @@ Node oneHotReorder(NodeInfo ni)
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         int ecId_ass = ni.equivClassId_ass;
-        NodeInfo curr = getNodeInfo(n[i], ecId_ass);
-        child.push_back(getNodeInfo(oneHotReorder(curr), ecId_ass));
+        NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
+        child.push_back(getNodeInfo(oneHotReorder(curr), ecId_ass, -1));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -920,7 +921,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (const Node& assertion : assertionsToPreprocess->ref())
     {
         Node curr = fixflips(assertion);
-        nodeInfos.push_back(getNodeInfo(curr));
+        nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
     // std::cout << "FIXED FLIPS" << std::endl;
     /////////////////////////////////////////////////////////////
@@ -936,7 +937,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (NodeInfo ni: prv_nodeInfos)
     {
         Node curr = sortOp1(ni);
-        nodeInfos.push_back(getNodeInfo(curr));
+        nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
     // std::cout << "SORTED OPERANDS" << std::endl;
     /////////////////////////////////////////////////////////////
@@ -951,7 +952,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         currAssertion = ni;
         Node reordered = oneHotReorder(ni);
-        nodeInfos.push_back(getNodeInfo(reordered));
+        nodeInfos.push_back(getNodeInfo(reordered, -1, -1));
     }
     /////////////////////////////////////////////////////////////
 
@@ -1019,7 +1020,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     nodeInfos.clear();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass));
+        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass, ni.equivClassId_operands));
     }
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
     // std::cout << "SORTED ASSERTIONS" << std::endl;
@@ -1075,7 +1076,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (NodeInfo ni: prv_nodeInfos)
     {
         Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
-        nodeInfos.push_back(getNodeInfo(renamed));
+        nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
     }
     /////////////////////////////////////////////////////////////
 
