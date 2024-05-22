@@ -73,15 +73,15 @@ struct NodeInfo
     std::vector<int> pat;
     std::vector<std::string> varNames; 
     std::map<std::string, int> role;
-    unsigned equivClassId;
+    unsigned equivClassId_ass;
     NodeInfo() {
         
     }
-    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId) : 
-        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId(ecId) {}
+    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId_ass) : 
+        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId_ass(ecId_ass) {}
 } currAssertion;
 
-std::map<int, std::vector<NodeInfo>> ec;
+std::map<int, std::vector<NodeInfo>> ec_ass;
 
 int getRole(std::string var, NodeInfo n)
 {
@@ -92,7 +92,7 @@ int getRole(std::string var, NodeInfo n)
     return 0;
 }
 
-NodeInfo getNodeInfo(Node n, unsigned ecId = 0)
+NodeInfo getNodeInfo(Node n, unsigned ecId_ass = 0)
 {
     // std::cout << "Constructing node info for " << n << std::endl;
 
@@ -116,7 +116,7 @@ NodeInfo getNodeInfo(Node n, unsigned ecId = 0)
         pat.push_back(varMap[varNames[i]]);
     }
     // std::cout << "---------------------------------" << std::endl;
-    return NodeInfo(n, encoding, pat, varNames, role, ecId);
+    return NodeInfo(n, encoding, pat, varNames, role, ecId_ass);
 }
 
 
@@ -281,21 +281,21 @@ bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
     if (a.isVar() && b.isVar())
     {
         // std::cout << "Calculating super-pattern for " << a << " and " << b << std::endl;
-        int ecId = nia.equivClassId; // also b.equivClassId
+        int ecId_ass = nia.equivClassId_ass; // also b.equivClassId_ass
         std::vector<int> spat_a, spat_b;
         std::string var_a = a.toString(), var_b = b.toString();
-        // std::cout << "j=" << ecId << " " << ec[ecId].size() << std::endl;
-        for (int j = ecId; ec[j].size() > 0; ++j)
+        // std::cout << "j=" << ecId_ass << " " << ec_ass[ecId_ass].size() << std::endl;
+        for (int j = ecId_ass; ec_ass[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec[j])
+            for (NodeInfo curr : ec_ass[j])
             {
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
             }
             sort(pat_j_a.begin(), pat_j_a.end()); // ToDo: Do we need to sorts?
             sort(pat_j_b.begin(), pat_j_b.end());
-            // Append pattern of var_a in ec[j] to spat_a
+            // Append pattern of var_a in ec_ass[j] to spat_a
             for (int k = 0; k < pat_j_a.size(); k++)
             {
                 spat_a.push_back(pat_j_a[k]);
@@ -358,15 +358,15 @@ bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
 
 bool complexCmp(const NodeInfo& a, const NodeInfo& b)
 {
-    if (a.equivClassId  != b.equivClassId)
+    if (a.equivClassId_ass  != b.equivClassId_ass)
     {
-        return a.equivClassId < b.equivClassId;
+        return a.equivClassId_ass < b.equivClassId_ass;
     }
 
     // std::cout << "Comparing " << a.node << " and " << b.node << std::endl;
 
     // Calculate the super-pattern of a and b and compare them lexico-graphically
-    int ecId = a.equivClassId; // also b.equivClassId
+    int ecId_ass = a.equivClassId_ass; // also b.equivClassId_ass
     std::vector<int> spat_a, spat_b;
     for (int i = 0; i < a.varNames.size(); ++i)
     {
@@ -378,10 +378,10 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
         // Calculate super-pattern of var_a and var_b in next equivalent classes
         spat_a.clear();
         spat_b.clear();
-        for (int j = ecId; ec[j].size() > 0; ++j)
+        for (int j = ecId_ass; ec_ass[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec[j])
+            for (NodeInfo curr : ec_ass[j])
             {
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
@@ -403,7 +403,7 @@ bool complexCmp(const NodeInfo& a, const NodeInfo& b)
 
             sort(pat_j_a.begin(), pat_j_a.end());
             sort(pat_j_b.begin(), pat_j_b.end());
-            // Append pattern of var_a in ec[j] to spat_a
+            // Append pattern of var_a in ec_ass[j] to spat_a
             for (size_t k = 0; k < pat_j_a.size(); k++)
             {
                 spat_a.push_back(pat_j_a[k]);
@@ -512,6 +512,17 @@ Node sortOp1(NodeInfo ni)
     int commutative = isCommutative(n.getKind());
 
 
+
+    if (commutative != -1)
+    {
+        // Calculate equivalence classes for the children (operands)
+        std::map<int, std::vector<NodeInfo>> ec_operands;
+
+
+    }
+
+
+
     if (commutative == 0)
     {
         // std::cout << "Sorting " << n << std::endl;
@@ -585,9 +596,9 @@ Node sortOp3(NodeInfo ni)
     std::vector<NodeInfo> child;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        int ecId = ni.equivClassId;
-        NodeInfo curr = getNodeInfo(n[i], ecId);
-        child.push_back(getNodeInfo(sortOp3(curr), ecId));
+        int ecId_ass = ni.equivClassId_ass;
+        NodeInfo curr = getNodeInfo(n[i], ecId_ass);
+        child.push_back(getNodeInfo(sortOp3(curr), ecId_ass));
         // child.push_back(getNodeInfo(sortOp3(getNodeInfo(n[i]))));
     } 
     int commutative = isCommutative(n.getKind());
@@ -681,9 +692,9 @@ Node oneHotReorder(NodeInfo ni)
     std::vector<NodeInfo> child;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        int ecId = ni.equivClassId;
-        NodeInfo curr = getNodeInfo(n[i], ecId);
-        child.push_back(getNodeInfo(oneHotReorder(curr), ecId));
+        int ecId_ass = ni.equivClassId_ass;
+        NodeInfo curr = getNodeInfo(n[i], ecId_ass);
+        child.push_back(getNodeInfo(oneHotReorder(curr), ecId_ass));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -958,21 +969,21 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 5: Calculate equivalence classes
-    unsigned ecId = 1;
-    nodeInfos[0].equivClassId = ecId;
-    ec[ecId].push_back(nodeInfos[0]);
+    unsigned ecId_ass = 1;
+    nodeInfos[0].equivClassId_ass = ecId_ass;
+    ec_ass[ecId_ass].push_back(nodeInfos[0]);
     // std::cout << "EC1" << std::endl;
     // std::cout << nodeInfos[0].node << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
     {
         if (!sameClass(nodeInfos[i], nodeInfos[i - 1]))
         {
-            ecId++;
+            ecId_ass++;
             // std::cout << "******" << std::endl;
-            // std::cout << "EC" << ecId << std::endl;
+            // std::cout << "EC" << ecId_ass << std::endl;
         }
-        nodeInfos[i].equivClassId = ecId;
-        ec[ecId].push_back(nodeInfos[i]);
+        nodeInfos[i].equivClassId_ass = ecId_ass;
+        ec_ass[ecId_ass].push_back(nodeInfos[i]);
         // std::cout << nodeInfos[i].encoding << std::endl;
         // std::cout << nodeInfos[i].node << std::endl;
     }
@@ -990,11 +1001,11 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (NodeInfo ni: prv_nodeInfos)
     {
         // std::cout << "Resorting operands of " << ni.node << std::endl;
-        // std::cout << ni.equivClassId << std::endl;
+        // std::cout << ni.equivClassId_ass << std::endl;
         Node curr = sortOp3(ni);
         // std::cout << curr << std::endl;
         // std::cout << "\n";
-        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId));
+        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId_ass));
     }
 
     // std::cout << "SORTED OPERANDS" << std::endl;
@@ -1008,7 +1019,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     nodeInfos.clear();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId));
+        nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass));
     }
     sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
     // std::cout << "SORTED ASSERTIONS" << std::endl;
