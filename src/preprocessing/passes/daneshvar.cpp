@@ -874,24 +874,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-
-    /////////////////////////////////////////////////////////////
-    // Step 2: Sort operands of commutative operators using 1. encoding 2. pattern 3. super-patterns
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
-
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        Node curr = sortOp1(ni);
-        nodeInfos.push_back(getNodeInfo(curr, -1, -1));
-    }
-    std::cout << "SORTED OPERANDS" << std::endl;
-    /////////////////////////////////////////////////////////////
-
-
-
     /////////////////////////////////////////////////////////////    
-    // Step 3: Sort based on encoding and pattern to calculate equivalence classes
+    // Step 2: Sort based on encoding and pattern to calculate equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); 
     std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
     /////////////////////////////////////////////////////////////
@@ -899,12 +883,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-
-
-
-
     /////////////////////////////////////////////////////////////
-    // Step 4: Calculate equivalence classes for assertions
+    // Step 3: Calculate equivalence classes for assertions
     unsigned ecId_ass = 1;
     nodeInfos[0].equivClassId_ass = ecId_ass;
     ec_ass[ecId_ass].push_back(nodeInfos[0]);
@@ -932,7 +912,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
     /////////////////////////////////////////////////////////////
-    // Step 5: Sort the assertions based on our super complex metric!
+    // Step 4: Sort the assertions based on our super complex metric!
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
     for (NodeInfo ni: prv_nodeInfos)
@@ -948,28 +928,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-
     /////////////////////////////////////////////////////////////
-    // Step 6: Sort the operands once again
-    prv_nodeInfos = nodeInfos;
-    nodeInfos.clear();
-    for (NodeInfo ni: prv_nodeInfos)
-    {
-        Node curr = sortOp3(ni);
-        nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId_ass, -1));
-    }
-    /////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-    /////////////////////////////////////////////////////////////
-    // Step 7: Variable normalization left ro right top to bottom
+    // Step 5: Variable normalization left ro right top to bottom
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
 
@@ -989,16 +949,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 8: Final sort with new names. NEEDED?
-    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
-    // std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
+    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
+    std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
     ///////////////////////////////////////////////////////////
 
 
 
 
-    /*
+    
     // Step 5: Final renaming
-
     // prv_nodeInfos = nodeInfos;
     // nodeInfos.clear();
 
@@ -1009,11 +968,11 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     // std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
     //     Node renamed = rename(prv_nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
     //     // std::cout << "RENAMED " << std::endl << renamed << std::endl;
-    //     nodeInfos.push_back(getNodeInfo(renamed));
+    //     nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
     //     // std::cout << "---------------------------------" << std::endl;
     // }
 
-    */
+    
 
 
     
