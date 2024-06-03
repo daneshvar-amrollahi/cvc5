@@ -761,6 +761,7 @@ Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
     std::map<std::string, Node> &boundVar2node, 
+    std::map<std::string, Node> &function2node,
     NodeManager* nodeManager)
 {
     // std::cout << "Renaming " << n << std::endl;
@@ -817,6 +818,37 @@ Node rename(
         }
 
     }
+    // std::cout << "Visiting "  << n << std::endl;
+
+
+    if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
+    {
+        if (function2node.find(n.getOperator().toString()) != function2node.end())
+        {
+            return function2node[n.getOperator().toString()];
+        }
+        else
+        {
+            int id = function2node.size();
+            std::vector<Node> cnodes;
+            std::string new_func_name = "f";
+            for (int i = 0; i < 5 - numDigits(id); i++)
+            {
+                new_func_name += "0";
+            }
+            new_func_name += std::to_string(id);
+            // What to do here?
+        }
+
+        auto name = n.getOperator().toString();
+        // std::cout << "APPLY_UF " << name << std::endl;
+        // std::cout << "Children: " << n.getNumChildren() << std::endl;
+        // // ToDo: Create operator of kind APPLY_UF with new name
+        // Node boz = nodeManager->getSkolemManager()->mkPurifySkolem(n);
+        // std::cout << "New boz: " << boz.toString() << std::endl;
+
+    }
+
 
     std::vector<Node> children;
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -826,7 +858,7 @@ Node rename(
     
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        children.push_back(rename(n[i], freeVar2node, boundVar2node, nodeManager));
+        children.push_back(rename(n[i], freeVar2node, boundVar2node, function2node, nodeManager));
     }
 
     // std::cout << freeVar2node.size() << " " << boundVar2node.size() << std::endl;
@@ -935,10 +967,11 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
+    std::map<std::string, Node> function2node;
     NodeManager* nodeManager = NodeManager::currentNM();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
+        Node renamed = rename(ni.node, freeVar2node, boundVar2node, function2node, nodeManager);
         nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
     }
     /////////////////////////////////////////////////////////////
