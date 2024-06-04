@@ -765,8 +765,6 @@ Node rename(
     NodeManager* nodeManager)
 {
 
-    std::cout << "Visiting " << n << std::endl;
-    std::cout << "kind: " << n.getKind() << std::endl;
 
 
     // std::cout << "Renaming " << n << std::endl;
