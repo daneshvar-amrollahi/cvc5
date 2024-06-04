@@ -764,6 +764,11 @@ Node rename(
     std::map<std::string, Node> &function2node,
     NodeManager* nodeManager)
 {
+
+    std::cout << "Visiting " << n << std::endl;
+    std::cout << "kind: " << n.getKind() << std::endl;
+
+
     // std::cout << "Renaming " << n << std::endl;
     if (n.isConst())
     {
@@ -820,37 +825,34 @@ Node rename(
     }
     // std::cout << "Visiting "  << n << std::endl;
 
-
-    if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
-    {
-        if (function2node.find(n.getOperator().toString()) != function2node.end())
-        {
-            return function2node[n.getOperator().toString()];
-        }
-        else
-        {
-            int id = function2node.size();
-            std::vector<Node> cnodes;
-            std::string new_func_name = "f";
-            for (int i = 0; i < 5 - numDigits(id); i++)
-            {
-                new_func_name += "0";
-            }
-            new_func_name += std::to_string(id);
-            // What to do here?
-        }
-
-        auto name = n.getOperator().toString();
-        // std::cout << "APPLY_UF " << name << std::endl;
-        // std::cout << "Children: " << n.getNumChildren() << std::endl;
-        // // ToDo: Create operator of kind APPLY_UF with new name
-        // Node boz = nodeManager->getSkolemManager()->mkPurifySkolem(n);
-        // std::cout << "New boz: " << boz.toString() << std::endl;
-
-    }
-
+    
 
     std::vector<Node> children;
+
+    
+    if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
+    {
+        // if (function2node.find(n.getOperator().toString()) != function2node.end())
+        // {
+        //     return function2node[n.getOperator().toString()];
+        // }
+        // else
+        // {
+        //     int id = function2node.size();
+        //     std::vector<Node> cnodes;
+        //     std::string new_func_name = "f";
+        //     for (int i = 0; i < 5 - numDigits(id); i++)
+        //     {
+        //         new_func_name += "0";
+        //     }
+        //     new_func_name += std::to_string(id);
+
+
+            Node renamed_function = rename(n.getOperator(), freeVar2node, boundVar2node, function2node, nodeManager);
+
+            children.push_back(renamed_function);
+    }
+    else
     if (n.getMetaKind() == metakind::PARAMETERIZED)
     {
         children.push_back(n.getOperator());
