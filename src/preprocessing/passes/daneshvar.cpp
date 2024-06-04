@@ -757,6 +757,8 @@ int numDigits(int n)
     return count;
 }
 
+std::map<Node, Node> normalized;
+
 Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
@@ -764,11 +766,14 @@ Node rename(
     NodeManager* nodeManager)
 {
 
-
-
+    if (normalized.find(n) != normalized.end())
+    {
+        return normalized[n];
+    }
     // std::cout << "Renaming " << n << std::endl;
     if (n.isConst())
     {
+        normalized[n] = n;
         return n;
     }
     if (n.isVar())
@@ -777,7 +782,9 @@ Node rename(
         {
             if (boundVar2node.find(n.toString()) != boundVar2node.end())
             {
-                return boundVar2node[n.toString()];
+                Node ret = boundVar2node[n.toString()];
+                normalized[n] = ret;
+                return ret;
             }
             else
             {
@@ -791,6 +798,7 @@ Node rename(
 
                 Node ret = nodeManager->mkBoundVar(new_var_name, n.getType());
                 boundVar2node[n.toString()] = ret;
+                normalized[n] = ret;
                 return ret;
             }
         }
@@ -798,7 +806,9 @@ Node rename(
         {
             if (freeVar2node.find(n.toString()) != freeVar2node.end())
             {
-                return freeVar2node[n.toString()];
+                Node ret = freeVar2node[n.toString()];
+                normalized[n] = ret;
+                return ret;
             }
             else
             {
@@ -815,6 +825,7 @@ Node rename(
                 cnodes.push_back(gt);
                 Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
                 freeVar2node[n.toString()] = ret;
+                normalized[n] = ret;
                 return ret;
             }
         }
@@ -852,8 +863,9 @@ Node rename(
     }
 
 
-    
-    return nodeManager->mkNode(n.getKind(), children);
+    Node ret = nodeManager->mkNode(n.getKind(), children);
+    normalized[n] = ret;
+    return ret;
 }
 
 
