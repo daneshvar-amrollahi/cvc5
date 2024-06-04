@@ -761,7 +761,6 @@ Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
     std::map<std::string, Node> &boundVar2node, 
-    std::map<std::string, Node> &function2node,
     NodeManager* nodeManager)
 {
 
@@ -828,7 +827,7 @@ Node rename(
     
     if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
     {
-        children.push_back(rename(n.getOperator(), freeVar2node, boundVar2node, function2node, nodeManager));
+        children.push_back(rename(n.getOperator(), freeVar2node, boundVar2node, nodeManager));
     }
     else
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -838,7 +837,7 @@ Node rename(
     
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        children.push_back(rename(n[i], freeVar2node, boundVar2node, function2node, nodeManager));
+        children.push_back(rename(n[i], freeVar2node, boundVar2node, nodeManager));
     }
 
 
@@ -869,7 +868,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::vector<NodeInfo> nodeInfos, prv_nodeInfos;
 
 
-    std::cout << "PREPROCESSED ASSERTIONS" << std::endl;
+    // std::cout << "PREPROCESSED ASSERTIONS" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 1: Fix anti-symmetric operators
@@ -878,7 +877,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node curr = fixflips(assertion);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    std::cout << "FIXED FLIPS" << std::endl;
+    // std::cout << "FIXED FLIPS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
@@ -886,7 +885,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////    
     // Step 2: Sort based on encoding and pattern to calculate equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); 
-    std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
+    // std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
@@ -944,11 +943,10 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     std::map<std::string, Node> freeVar2node;
     std::map<std::string, Node> boundVar2node;
-    std::map<std::string, Node> function2node;
     NodeManager* nodeManager = NodeManager::currentNM();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node renamed = rename(ni.node, freeVar2node, boundVar2node, function2node, nodeManager);
+        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
         nodeInfos.push_back(getNodeInfo(renamed, -1, -1));        
     }
     /////////////////////////////////////////////////////////////
@@ -960,7 +958,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////
     // Step 8: Final sort with new names. NEEDED?
     sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
-    std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
+    // std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
     ///////////////////////////////////////////////////////////
 
 
@@ -985,17 +983,16 @@ PreprocessingPassResult Daneshvar::applyInternal(
     
 
 
-    
 
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        std::cout << nodeInfos[i].node << std::endl;
+        // std::cout << nodeInfos[i].node << std::endl;
     }
 
 
-    abort();
+    // abort();
 
 
   return PreprocessingPassResult::NO_CONFLICT;
