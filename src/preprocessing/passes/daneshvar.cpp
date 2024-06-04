@@ -782,8 +782,8 @@ Node rename(
             }
             else
             {
-                int id = boundVar2node.size() + 1;
-                std::string new_var_name = "v";
+                int id = boundVar2node.size();
+                std::string new_var_name = "u";
                 for (int i = 0; i < 5 - numDigits(id); i++)
                 {
                     new_var_name += "0";
@@ -821,34 +821,14 @@ Node rename(
         }
 
     }
-    // std::cout << "Visiting "  << n << std::endl;
-
-    
+ 
 
     std::vector<Node> children;
 
     
     if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
     {
-        // if (function2node.find(n.getOperator().toString()) != function2node.end())
-        // {
-        //     return function2node[n.getOperator().toString()];
-        // }
-        // else
-        // {
-        //     int id = function2node.size();
-        //     std::vector<Node> cnodes;
-        //     std::string new_func_name = "f";
-        //     for (int i = 0; i < 5 - numDigits(id); i++)
-        //     {
-        //         new_func_name += "0";
-        //     }
-        //     new_func_name += std::to_string(id);
-
-
-            Node renamed_function = rename(n.getOperator(), freeVar2node, boundVar2node, function2node, nodeManager);
-
-            children.push_back(renamed_function);
+        children.push_back(rename(n.getOperator(), freeVar2node, boundVar2node, function2node, nodeManager));
     }
     else
     if (n.getMetaKind() == metakind::PARAMETERIZED)
@@ -861,15 +841,12 @@ Node rename(
         children.push_back(rename(n[i], freeVar2node, boundVar2node, function2node, nodeManager));
     }
 
-    // std::cout << freeVar2node.size() << " " << boundVar2node.size() << std::endl;
 
     if (n.getKind() == cvc5::internal::Kind::FORALL || n.getKind() == cvc5::internal::Kind::EXISTS)
     {
         Node bound_vars = n[0];
-        // std::cout << "BOUND_VAR_LIST" << std::endl;
         for (size_t i = 0; i < bound_vars.getNumChildren(); i++)
         {
-            // std::cout << "Erasing " << bound_vars[i].toString() << ":" << boundVar2node[bound_vars[i].toString()] << std::endl;
             AssertArgument(boundVar2node.find(bound_vars[i].toString()) != boundVar2node.end(), "Bound variable not found in boundVar2node");
             boundVar2node.erase(bound_vars[i].toString());
         }
@@ -972,7 +949,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (NodeInfo ni: prv_nodeInfos)
     {
         Node renamed = rename(ni.node, freeVar2node, boundVar2node, function2node, nodeManager);
-        nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
+        nodeInfos.push_back(getNodeInfo(renamed, -1, -1));        
     }
     /////////////////////////////////////////////////////////////
 
