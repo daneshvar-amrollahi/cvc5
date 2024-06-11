@@ -1067,10 +1067,10 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        std::cout << "Renaming: " << ni.node << std::endl;
+        // std::cout << "Renaming: " << ni.node << std::endl;
         Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
-        std::cout << "Renamed: " << renamed << std::endl;
-        std::cout << "-----------------" << std::endl;
+        // std::cout << "Renamed: " << renamed << std::endl;
+        // std::cout << "-----------------" << std::endl;
         nodeInfos.push_back(getNodeInfo(renamed, -1, -1));        
     }
     /////////////////////////////////////////////////////////////
