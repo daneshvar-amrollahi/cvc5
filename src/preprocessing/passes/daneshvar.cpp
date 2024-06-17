@@ -757,119 +757,6 @@ int numDigits(int n)
     return count;
 }
 
-std::map<Node, Node> normalized;
-
-/*
-Node rename(
-    Node n, 
-    std::map<std::string, Node> &freeVar2node, 
-    std::map<std::string, Node> &boundVar2node, 
-    NodeManager* nodeManager)
-{
-
-    if (normalized.find(n) != normalized.end())
-    {
-        return normalized[n];
-    }
-    // std::cout << "Renaming " << n << std::endl;
-    if (n.isConst())
-    {
-        normalized[n] = n;
-        return n;
-    }
-    if (n.isVar())
-    {
-        if (n.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
-        {
-            if (boundVar2node.find(n.toString()) != boundVar2node.end())
-            {
-                Node ret = boundVar2node[n.toString()];
-                normalized[n] = ret;
-                return ret;
-            }
-            else
-            {
-                int id = boundVar2node.size();
-                std::string new_var_name = "u";
-                for (int i = 0; i < 5 - numDigits(id); i++)
-                {
-                    new_var_name += "0";
-                }
-                new_var_name += std::to_string(id);
-
-                Node ret = nodeManager->mkBoundVar(new_var_name, n.getType());
-                boundVar2node[n.toString()] = ret;
-                normalized[n] = ret;
-                return ret;
-            }
-        }
-        else
-        {
-            if (freeVar2node.find(n.toString()) != freeVar2node.end())
-            {
-                Node ret = freeVar2node[n.toString()];
-                normalized[n] = ret;
-                return ret;
-            }
-            else
-            {
-                std::vector<Node> cnodes;
-                int id = freeVar2node.size();
-                std::string new_var_name = "v";
-                for (int i = 0; i < 5 - numDigits(id); i++)
-                {
-                    new_var_name += "0";
-                }
-                new_var_name += std::to_string(id);
-                cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
-                Node gt = nodeManager->mkConst(SortToTerm(n.getType()));
-                cnodes.push_back(gt);
-                Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
-                freeVar2node[n.toString()] = ret;
-                normalized[n] = ret;
-                return ret;
-            }
-        }
-
-    }
- 
-
-    std::vector<Node> children;
-
-    
-    if (n.getKind() == cvc5::internal::Kind::APPLY_UF)
-    {
-        children.push_back(rename(n.getOperator(), freeVar2node, boundVar2node, nodeManager));
-    }
-    else
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        children.push_back(n.getOperator());
-    }
-    
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        children.push_back(rename(n[i], freeVar2node, boundVar2node, nodeManager));
-    }
-
-
-    if (n.getKind() == cvc5::internal::Kind::FORALL || n.getKind() == cvc5::internal::Kind::EXISTS)
-    {
-        Node bound_vars = n[0];
-        for (size_t i = 0; i < bound_vars.getNumChildren(); i++)
-        {
-            AssertArgument(boundVar2node.find(bound_vars[i].toString()) != boundVar2node.end(), "Bound variable not found in boundVar2node");
-            boundVar2node.erase(bound_vars[i].toString());
-        }
-    }
-
-
-    Node ret = nodeManager->mkNode(n.getKind(), children);
-    normalized[n] = ret;
-    return ret;
-}
-
-*/
 
 
 
@@ -989,7 +876,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::vector<NodeInfo> nodeInfos, prv_nodeInfos;
 
 
-    // std::cout << "PREPROCESSED ASSERTIONS" << std::endl;
+    std::cout << "PREPROCESSED ASSERTIONS" << std::endl;
 
     /////////////////////////////////////////////////////////////
     // Step 1: Fix anti-symmetric operators
@@ -998,22 +885,42 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node curr = fixflips(assertion);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    // std::cout << "FIXED FLIPS" << std::endl;
+    std::cout << "FIXED FLIPS" << std::endl;
+    /////////////////////////////////////////////////////////////
+
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 2: Sort operands of commutative operators using 1. encoding 2. pattern 3. super-patterns
+    prv_nodeInfos = nodeInfos;
+    nodeInfos.clear();
+
+    for (NodeInfo ni: prv_nodeInfos)
+    {
+        Node curr = sortOp1(ni);
+        nodeInfos.push_back(getNodeInfo(curr, -1, -1));
+    }
+    std::cout << "SORTED OPERANDS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
 
     /////////////////////////////////////////////////////////////    
-    // Step 2: Sort based on encoding and pattern to calculate equivalence classes
+    // Step 3: Sort based on encoding and pattern to calculate equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); 
-    // std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
+    std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
 
 
+
+
+
+
     /////////////////////////////////////////////////////////////
-    // Step 3: Calculate equivalence classes for assertions
+    // Step 4: Calculate equivalence classes for assertions
     unsigned ecId_ass = 1;
     nodeInfos[0].equivClassId_ass = ecId_ass;
     ec_ass[ecId_ass].push_back(nodeInfos[0]);
@@ -1041,7 +948,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
     /////////////////////////////////////////////////////////////
-    // Step 4: Sort the assertions based on our super complex metric!
+    // Step 5: Sort the assertions based on our super complex metric!
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
     for (NodeInfo ni: prv_nodeInfos)
@@ -1057,8 +964,28 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
+
     /////////////////////////////////////////////////////////////
-    // Step 5: Variable normalization left ro right top to bottom
+    // Step 6: Sort the operands once again
+    // prv_nodeInfos = nodeInfos;
+    // nodeInfos.clear();
+    // for (NodeInfo ni: prv_nodeInfos)
+    // {
+    //     Node curr = sortOp3(ni);
+    //     nodeInfos.push_back(getNodeInfo(curr, ni.equivClassId_ass, -1));
+    // }
+    /////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 7: Variable normalization left ro right top to bottom
     prv_nodeInfos = nodeInfos;
     nodeInfos.clear();
 
@@ -1067,11 +994,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        // std::cout << "Renaming: " << ni.node << std::endl;
         Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
-        // std::cout << "Renamed: " << renamed << std::endl;
-        // std::cout << "-----------------" << std::endl;
-        nodeInfos.push_back(getNodeInfo(renamed, -1, -1));        
+        nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
     }
     /////////////////////////////////////////////////////////////
 
@@ -1081,15 +1005,16 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     /////////////////////////////////////////////////////////////
     // Step 8: Final sort with new names. NEEDED?
-    sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
+    // sort(nodeInfos.begin(), nodeInfos.end(), nodeInfoCmp); 
     // std::cout << "FINAL SORT WITHIN EQUIVALENCE CLASSES" << std::endl;
     ///////////////////////////////////////////////////////////
 
 
 
 
-    
+    /*
     // Step 5: Final renaming
+
     // prv_nodeInfos = nodeInfos;
     // nodeInfos.clear();
 
@@ -1100,23 +1025,23 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     // std::cout << "RENAMING " << std::endl << nodeInfos[i].node << std::endl;
     //     Node renamed = rename(prv_nodeInfos[i].node, freeVar2node, boundVar2node, nodeManager);
     //     // std::cout << "RENAMED " << std::endl << renamed << std::endl;
-    //     nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
+    //     nodeInfos.push_back(getNodeInfo(renamed));
     //     // std::cout << "---------------------------------" << std::endl;
     // }
 
+    */
+
+
     
-
-
 
 
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        // std::cout << nodeInfos[i].node << std::endl;
+        std::cout << nodeInfos[i].node << std::endl;
     }
 
 
-    // abort();
 
 
   return PreprocessingPassResult::NO_CONFLICT;
