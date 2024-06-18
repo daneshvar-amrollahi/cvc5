@@ -1104,7 +1104,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
         assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        std::cout << nodeInfos[i].node << std::endl;
+    //     std::cout << nodeInfos[i].node << std::endl;
     }
 
 
