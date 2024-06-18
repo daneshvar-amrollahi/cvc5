@@ -181,7 +181,7 @@ bool operandsCmpR2(const Node& a, const Node& b)
 
 bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 {
-    std::cout << "Comparing " << nia.node << " and " << nib.node << std::endl;
+    // std::cout << "Comparing " << nia.node << " and " << nib.node << std::endl;
     Node a = nia.node, b = nib.node;
     // std::string sa, sb;
     // if (a.isVar())
@@ -593,18 +593,6 @@ Node sortOp1(NodeInfo ni)
             ec_oper[ecId_operands].push_back(child[i]);
         }
 
-        // std::cout << "Sorting operands of " << n << std::endl;
-        // Print equivalence classes
-        // for (auto it = ec_oper.begin(); it != ec_oper.end(); ++it)
-        // {
-        //     std::cout << "EC" << it->first << std::endl;
-        //     for (NodeInfo curr : it->second)
-        //     {
-        //         std::cout << curr.node << std::endl;
-        //     }
-        //     std::cout << "----------------" << std::endl;
-        // }
-
         std::sort(child.begin(), child.begin() + commutative, operandsCmpR1);
 
     }
@@ -625,6 +613,89 @@ Node sortOp1(NodeInfo ni)
 
     return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
 }
+
+
+
+Node sortOperands(NodeInfo ni) {
+    Node n = ni.node;
+    if (n.isVar() || n.isConst()) {
+        return n;
+    }
+
+    // Two stacks for the DFS traversal
+    std::stack<NodeInfo> toVisit;
+    std::stack<NodeInfo> processStack;
+
+    toVisit.push(ni);
+
+    // Stores the child nodes for each node to be processed later
+    std::map<Node, std::vector<NodeInfo>> nodeChildrenMap;
+
+    while (!toVisit.empty()) {
+        NodeInfo currentNodeInfo = toVisit.top();
+        toVisit.pop();
+
+        Node currentNode = currentNodeInfo.node;
+
+        if (currentNode.isVar() || currentNode.isConst()) {
+            continue;
+        }
+
+        processStack.push(currentNodeInfo);
+
+        std::vector<NodeInfo> child;
+        for (size_t i = 0; i < currentNode.getNumChildren(); i++) {
+            NodeInfo childInfo = getNodeInfo(currentNode[i], -1, -1);
+            child.push_back(childInfo);
+            toVisit.push(childInfo);
+        }
+        nodeChildrenMap[currentNode] = child;
+    }
+
+    // Now process the nodes in the correct order
+    while (!processStack.empty()) {
+        NodeInfo currentNodeInfo = processStack.top();
+        processStack.pop();
+
+        Node currentNode = currentNodeInfo.node;
+        std::vector<NodeInfo> child = nodeChildrenMap[currentNode];
+
+        int commutative = isCommutative(currentNode.getKind());
+
+        if (commutative != -1) {
+            ec_oper.clear();
+            std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
+
+            int ecId_operands = 1;
+            child[commutative].equivClassId_operands = ecId_operands;
+            ec_oper[ecId_operands].push_back(child[commutative]);
+            for (size_t i = commutative + 1; i < child.size(); i++) {
+                if (!sameClass(child[i], child[i - 1])) {
+                    ecId_operands++;
+                }
+                child[i].equivClassId_operands = ecId_operands;
+                ec_oper[ecId_operands].push_back(child[i]);
+            }
+
+            std::sort(child.begin(), child.begin() + commutative, operandsCmpR1);
+        }
+
+        std::vector<Node> operands;
+        for (size_t i = 0; i < child.size(); i++) {
+            operands.push_back(child[i].node);
+        }
+
+        if (currentNode.getMetaKind() == metakind::PARAMETERIZED) {
+            operands.insert(operands.begin(), currentNode.getOperator());
+        }
+
+        Node sortedNode = NodeManager::currentNM()->mkNode(currentNode.getKind(), operands);
+        nodeChildrenMap[currentNode] = { getNodeInfo(sortedNode, -1, -1) };
+    }
+
+    return nodeChildrenMap[n][0].node;
+}
+
 
 
 
@@ -876,8 +947,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::vector<NodeInfo> nodeInfos, prv_nodeInfos;
 
 
-    std::cout << "PREPROCESSED ASSERTIONS" << std::endl;
-
     /////////////////////////////////////////////////////////////
     // Step 1: Fix anti-symmetric operators
     for (const Node& assertion : assertionsToPreprocess->ref())
@@ -885,7 +954,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
         Node curr = fixflips(assertion);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    std::cout << "FIXED FLIPS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
@@ -898,10 +966,9 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node curr = sortOp1(ni);
+        Node curr = sortOperands(ni);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
-    std::cout << "SORTED OPERANDS" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
@@ -909,7 +976,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////    
     // Step 3: Sort based on encoding and pattern to calculate equivalence classes
     sort(nodeInfos.begin(), nodeInfos.end(), equivClassCalcCmp); 
-    std::cout << "SORTED ASSERTIONS ON ENCODING" << std::endl;
     /////////////////////////////////////////////////////////////
 
 
