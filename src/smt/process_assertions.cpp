@@ -113,7 +113,6 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
     return true;
   }
 
-  applyPass("daneshvar", ap);
 
   if (options().bv.bvGaussElim)
   {
@@ -137,6 +136,9 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
   Trace("smt-proc")
       << "ProcessAssertions::processAssertions() : post-definition-expansion"
       << endl;
+
+  applyPass("daneshvar", ap);
+
 
   Trace("smt") << " assertions     : " << ap.size() << endl;
 
