@@ -24,6 +24,8 @@
 #include "util/string.h"
 #include "expr/node_converter.h"
 #include "util/statistics_registry.h"
+#include "preprocessing/preprocessing_pass_context.h" 
+
 
 #include <map>
 #include <stack>
@@ -878,7 +880,8 @@ Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
     std::map<std::string, Node> &boundVar2node, 
-    NodeManager* nodeManager)
+    NodeManager* nodeManager,
+    PreprocessingPassContext* d_preprocContext)
 {
     std::map<Node, Node> normalized;
     std::stack<Node> stack1, stack2;
@@ -928,6 +931,7 @@ Node rename(
                     Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
                     boundVar2node[current.toString()] = ret;
                     normalized[current] = ret;
+                    d_preprocContext->addSubstitution(current, ret);
                 }
             } else {
                 if (freeVar2node.find(current.toString()) != freeVar2node.end()) {
@@ -946,6 +950,7 @@ Node rename(
                     Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
                     freeVar2node[current.toString()] = ret;
                     normalized[current] = ret;
+                    d_preprocContext->addSubstitution(current, ret);
                 }
             }
             continue;
@@ -1068,7 +1073,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     for (NodeInfo ni: prv_nodeInfos)
     {
         // std::cout << "Renaming: " << ni.node << std::endl;
-        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
+        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
         // std::cout << "Renamed: " << renamed << std::endl;
         // std::cout << "-----------------" << std::endl;
         nodeInfos.push_back(getNodeInfo(renamed, -1, -1));        
@@ -1105,7 +1110,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // }
 
     
-
 
 
 
