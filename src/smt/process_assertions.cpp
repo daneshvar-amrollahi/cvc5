@@ -137,8 +137,6 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
       << "ProcessAssertions::processAssertions() : post-definition-expansion"
       << endl;
 
-  applyPass("daneshvar", ap);
-
 
   Trace("smt") << " assertions     : " << ap.size() << endl;
 
@@ -235,6 +233,7 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
     // were already solved for in incremental mode
     applyPass("apply-substs", ap);
   }
+
   if (options().smt.sortInference || options().uf.ufssFairnessMonotone)
   {
     applyPass("sort-inference", ap);
@@ -287,6 +286,9 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
     applyPass("apply-substs", ap);
     d_slvStats.d_numAssertionsPost += ap.size();
   }
+
+  applyPass("daneshvar", ap);
+
 
   if (options().smt.repeatSimp)
   {
