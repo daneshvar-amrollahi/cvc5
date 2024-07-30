@@ -899,9 +899,6 @@ Node rename(
 
         if (current.getKind() == cvc5::internal::Kind::APPLY_UF) {
             stack1.push(current.getOperator());
-        } else if (current.getMetaKind() == metakind::PARAMETERIZED) {
-            // stack1.push(current.getOperator());
-            // Do nothing!
         }
 
         for (size_t i = 0; i < current.getNumChildren(); i++) {
@@ -913,8 +910,6 @@ Node rename(
         Node current = stack2.top();
         stack2.pop();
 
-        // std::cout << "Current node: " << current << " " << current.getKind() << std::endl;
-
         if (current.isConst()) {
             normalized[current] = current;
             continue;
@@ -922,7 +917,6 @@ Node rename(
 
         if (current.isVar()) {
             if (current.getKind() == cvc5::internal::Kind::BOUND_VARIABLE) {
-                // std::cout << current << " is bound variable" << std::endl;
                 if (boundVar2node.find(current.toString()) != boundVar2node.end()) {
                     normalized[current] = boundVar2node[current.toString()];
                 } else {
@@ -937,7 +931,6 @@ Node rename(
                     normalized[current] = ret;
                 }
             } else {
-                // std::cout << current << " is not a bound variable" << std::endl;
                 if (freeVar2node.find(current.toString()) != freeVar2node.end()) {
                     normalized[current] = freeVar2node[current.toString()];
                 } else {
@@ -954,8 +947,6 @@ Node rename(
                     Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
                     freeVar2node[current.toString()] = ret;
                     normalized[current] = ret;
-                    // std::cout << current.getKind() << std::endl;
-                    // std::cout << "Adding substitution " << current << " -> " << ret << std::endl;
                     d_preprocContext->addSubstitution(current, ret);
                 }
             }
