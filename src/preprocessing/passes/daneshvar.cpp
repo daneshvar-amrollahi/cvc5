@@ -935,7 +935,6 @@ Node rename(
                     Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
                     boundVar2node[current.toString()] = ret;
                     normalized[current] = ret;
-                    d_preprocContext->addSubstitution(current, ret);
                 }
             } else {
                 // std::cout << current << " is not a bound variable" << std::endl;
