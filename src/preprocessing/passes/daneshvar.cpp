@@ -24,6 +24,7 @@
 #include "util/string.h"
 #include "expr/node_converter.h"
 #include "util/statistics_registry.h"
+#include "preprocessing/preprocessing_pass_context.h" 
 
 #include <map>
 #include <stack>
