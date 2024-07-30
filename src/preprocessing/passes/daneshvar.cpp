@@ -831,12 +831,12 @@ int numDigits(int n)
 
 
 
-
 Node rename(
     Node n, 
     std::map<std::string, Node> &freeVar2node, 
     std::map<std::string, Node> &boundVar2node, 
-    NodeManager* nodeManager)
+    NodeManager* nodeManager,
+    PreprocessingPassContext* d_preprocContext)
 {
     std::map<Node, Node> normalized;
     std::stack<Node> stack1, stack2;
@@ -853,8 +853,6 @@ Node rename(
         }
 
         if (current.getKind() == cvc5::internal::Kind::APPLY_UF) {
-            stack1.push(current.getOperator());
-        } else if (current.getMetaKind() == metakind::PARAMETERIZED) {
             stack1.push(current.getOperator());
         }
 
@@ -904,6 +902,7 @@ Node rename(
                     Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
                     freeVar2node[current.toString()] = ret;
                     normalized[current] = ret;
+                    d_preprocContext->addSubstitution(current, ret);
                 }
             }
             continue;
@@ -1060,7 +1059,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     NodeManager* nodeManager = NodeManager::currentNM();
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager);
+        Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
         nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
     }
     /////////////////////////////////////////////////////////////
