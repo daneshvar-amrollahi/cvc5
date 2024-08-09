@@ -594,7 +594,7 @@ Node sortOp1(NodeInfo ni)
             ec_oper[ecId_operands].push_back(child[i]);
         }
 
-        std::sort(child.begin(), child.begin() + commutative, operandsCmpR1);
+        std::sort(child.begin() + commutative, child.end(), operandsCmpR1);
 
     }
 
@@ -678,17 +678,20 @@ Node sortOperands(NodeInfo ni) {
                 ec_oper[ecId_operands].push_back(child[i]);
             }
 
-            std::sort(child.begin(), child.begin() + commutative, operandsCmpR1);
+            std::sort(child.begin() + commutative, child.end(), operandsCmpR1);
         }
 
         std::vector<Node> operands;
+        
+        if (currentNode.getMetaKind() == metakind::PARAMETERIZED) {
+            operands.push_back(currentNode.getOperator());
+        }
+        
         for (size_t i = 0; i < child.size(); i++) {
             operands.push_back(child[i].node);
         }
 
-        if (currentNode.getMetaKind() == metakind::PARAMETERIZED) {
-            operands.insert(operands.begin(), currentNode.getOperator());
-        }
+        
 
         Node sortedNode = NodeManager::currentNM()->mkNode(currentNode.getKind(), operands);
         nodeChildrenMap[currentNode] = { getNodeInfo(sortedNode, -1, -1) };
