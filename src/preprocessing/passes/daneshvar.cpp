@@ -644,6 +644,12 @@ Node sortOperands(NodeInfo ni) {
 
         processStack.push(currentNodeInfo);
 
+        
+        if (currentNode.getKind() == cvc5::internal::Kind::APPLY_UF) {
+            NodeInfo operatorInfo = getNodeInfo(currentNode.getOperator(), -1, -1);
+            toVisit.push(operatorInfo);
+        }
+
         std::vector<NodeInfo> child;
         for (size_t i = 0; i < currentNode.getNumChildren(); i++) {
             NodeInfo childInfo = getNodeInfo(currentNode[i], -1, -1);
