@@ -714,13 +714,10 @@ Node sortOperands(NodeInfo ni) {
         return n;
     }
 
-    // Stack for DFS traversal and processing
     std::stack<NodeInfo> toVisit;
 
-    // Map to store children nodes temporarily
     std::map<Node, std::vector<NodeInfo>> nodeChildrenMap;
 
-    // Map to store processed nodes
     std::map<Node, Node> processedNodes;
 
     toVisit.push(ni);
@@ -729,7 +726,6 @@ Node sortOperands(NodeInfo ni) {
         NodeInfo currentNodeInfo = toVisit.top();
         Node currentNode = currentNodeInfo.node;
 
-        // Check if the current node has already been processed
         if (processedNodes.find(currentNode) != processedNodes.end()) {
             toVisit.pop();
             continue;
@@ -741,7 +737,6 @@ Node sortOperands(NodeInfo ni) {
             continue;
         }
 
-        // If children haven't been visited, visit them first
         if (nodeChildrenMap.find(currentNode) == nodeChildrenMap.end()) {
             std::vector<NodeInfo> child;
             for (size_t i = 0; i < currentNode.getNumChildren(); i++) {
@@ -751,7 +746,6 @@ Node sortOperands(NodeInfo ni) {
             }
             nodeChildrenMap[currentNode] = child;
 
-            // Handle the APPLY_UF case
             if (currentNode.getKind() == cvc5::internal::Kind::APPLY_UF) {
                 NodeInfo operatorInfo = getNodeInfo(currentNode.getOperator(), -1, -1);
                 toVisit.push(operatorInfo);
@@ -759,7 +753,6 @@ Node sortOperands(NodeInfo ni) {
             continue;
         }
 
-        // Process the current node
         toVisit.pop();
 
         std::vector<NodeInfo> child = nodeChildrenMap[currentNode];
