@@ -616,14 +616,13 @@ Node sortOp1(NodeInfo ni)
 }
 
 
-
+/*
 Node sortOperands(NodeInfo ni) {
     Node n = ni.node;
     if (n.isVar() || n.isConst()) {
         return n;
     }
 
-    // Two stacks for the DFS traversal
     std::stack<NodeInfo> toVisit;
     std::stack<NodeInfo> processStack;
 
@@ -659,7 +658,7 @@ Node sortOperands(NodeInfo ni) {
         nodeChildrenMap[currentNode] = child;
     }
 
-    // Now process the nodes in the correct order
+    
     while (!processStack.empty()) {
         NodeInfo currentNodeInfo = processStack.top();
         processStack.pop();
@@ -705,6 +704,102 @@ Node sortOperands(NodeInfo ni) {
 
     return nodeChildrenMap[n][0].node;
 }
+Wrong. Why 2 stacks?
+*/
+
+
+Node sortOperands(NodeInfo ni) {
+    Node n = ni.node;
+    if (n.isVar() || n.isConst()) {
+        return n;
+    }
+
+    // Stack for DFS traversal and processing
+    std::stack<NodeInfo> toVisit;
+
+    // Map to store children nodes temporarily
+    std::map<Node, std::vector<NodeInfo>> nodeChildrenMap;
+
+    // Map to store processed nodes
+    std::map<Node, Node> processedNodes;
+
+    toVisit.push(ni);
+
+    while (!toVisit.empty()) {
+        NodeInfo currentNodeInfo = toVisit.top();
+        Node currentNode = currentNodeInfo.node;
+
+        // Check if the current node has already been processed
+        if (processedNodes.find(currentNode) != processedNodes.end()) {
+            toVisit.pop();
+            continue;
+        }
+
+        if (currentNode.isVar() || currentNode.isConst()) {
+            processedNodes[currentNode] = currentNode;
+            toVisit.pop();
+            continue;
+        }
+
+        // If children haven't been visited, visit them first
+        if (nodeChildrenMap.find(currentNode) == nodeChildrenMap.end()) {
+            std::vector<NodeInfo> child;
+            for (size_t i = 0; i < currentNode.getNumChildren(); i++) {
+                NodeInfo childInfo = getNodeInfo(currentNode[i], -1, -1);
+                child.push_back(childInfo);
+                toVisit.push(childInfo);
+            }
+            nodeChildrenMap[currentNode] = child;
+
+            // Handle the APPLY_UF case
+            if (currentNode.getKind() == cvc5::internal::Kind::APPLY_UF) {
+                NodeInfo operatorInfo = getNodeInfo(currentNode.getOperator(), -1, -1);
+                toVisit.push(operatorInfo);
+            }
+            continue;
+        }
+
+        // Process the current node
+        toVisit.pop();
+
+        std::vector<NodeInfo> child = nodeChildrenMap[currentNode];
+        int commutative = isCommutative(currentNode.getKind());
+
+        if (commutative != -1) {
+            ec_oper.clear();
+            std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
+
+            int ecId_operands = 1;
+            child[commutative].equivClassId_operands = ecId_operands;
+            ec_oper[ecId_operands].push_back(child[commutative]);
+            for (size_t i = commutative + 1; i < child.size(); i++) {
+                if (!sameClass(child[i], child[i - 1])) {
+                    ecId_operands++;
+                }
+                child[i].equivClassId_operands = ecId_operands;
+                ec_oper[ecId_operands].push_back(child[i]);
+            }
+
+            std::sort(child.begin() + commutative, child.end(), operandsCmpR1);
+        }
+
+        std::vector<Node> operands;
+
+        if (currentNode.getMetaKind() == metakind::PARAMETERIZED) {
+            operands.push_back(currentNode.getOperator());
+        }
+
+        for (size_t i = 0; i < child.size(); i++) {
+            operands.push_back(processedNodes[child[i].node]);
+        }
+
+        Node sortedNode = NodeManager::currentNM()->mkNode(currentNode.getKind(), operands);
+        processedNodes[currentNode] = sortedNode;
+    }
+
+    return processedNodes[n];
+}
+
 
 
 
