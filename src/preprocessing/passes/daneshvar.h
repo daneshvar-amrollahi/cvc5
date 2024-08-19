@@ -24,6 +24,38 @@ namespace cvc5::internal {
 namespace preprocessing {
 namespace passes {
 
+
+
+struct NodeInfo
+{
+  Node node;
+  std::string encoding;
+  std::vector<int> pat;
+  std::vector<std::string> varNames;
+  std::map<std::string, int> role;
+  unsigned equivClassId_ass;
+  unsigned equivClassId_operands;
+  NodeInfo() {}
+  NodeInfo(Node n,
+           std::string e,
+           std::vector<int> p,
+           std::vector<std::string> vn,
+           std::map<std::string, int> r,
+           unsigned ecId_ass,
+           unsigned ecId_op)
+      : node(n),
+        encoding(e),
+        pat(p),
+        varNames(vn),
+        role(r),
+        equivClassId_ass(ecId_ass),
+        equivClassId_operands(ecId_op)
+  {
+  }
+};
+
+
+
 /**
  * Eliminate all extended string functions in the input problem using
  * reductions to bounded string quantifiers.
@@ -46,6 +78,8 @@ private:
   };
 
   Statistics d_statistics;
+  std::map<int, std::vector<NodeInfo>> d_ec_ass;
+  std::map<int, std::vector<NodeInfo>> d_ec_oper;
 };
 
 }  // namespace passes

@@ -67,24 +67,7 @@ void dfs(Node n, std::string& encoding, std::vector<std::string> &varNames)
 }
 
 
-struct NodeInfo
-{
-    Node node;
-    std::string encoding;
-    std::vector<int> pat;
-    std::vector<std::string> varNames; 
-    std::map<std::string, int> role;
-    unsigned equivClassId_ass;
-    unsigned equivClassId_operands; 
-    NodeInfo() {
-        
-    }
-    NodeInfo(Node n, std::string e, std::vector<int> p, std::vector<std::string> vn, std::map<std::string, int> r, unsigned ecId_ass, unsigned ecId_op) : 
-        node(n), encoding(e), pat(p), varNames(vn), role(r), equivClassId_ass(ecId_ass), equivClassId_operands(ecId_op) {}
-};
 
-std::map<int, std::vector<NodeInfo>> ec_ass;
-std::map<int, std::vector<NodeInfo>> ec_oper;
 
 int getRole(std::string var, NodeInfo n)
 {
@@ -180,8 +163,11 @@ bool operandsCmpR2(const Node& a, const Node& b)
 }
 
 
-bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
-{
+bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
+                   std::map<int, std::vector<NodeInfo>>& ec_oper,
+                   const NodeInfo& nia,
+                   const NodeInfo& nib)
+ {
     // std::cout << "Comparing " << nia.node << " and " << nib.node << std::endl;
     Node a = nia.node, b = nib.node;
     // std::string sa, sb;
@@ -280,8 +266,11 @@ bool operandsCmpR1(const NodeInfo& nia, const NodeInfo& nib)
 
 
 
-bool operandsCmpR3(const NodeInfo& nia, const NodeInfo& nib)
-{
+bool operandsCmpR3(std::map<int, std::vector<NodeInfo>>& ec_ass,
+                   std::map<int, std::vector<NodeInfo>> ec_oper,
+                   const NodeInfo& nia,
+                   const NodeInfo& nib)
+ {
     Node a = nia.node, b = nib.node;
     if (nia.encoding != nib.encoding)
     {
@@ -413,7 +402,10 @@ bool equivClassCalcCmp(const NodeInfo& a, const NodeInfo& b)
     return false;
 }
 
-bool complexCmp(const NodeInfo& a, const NodeInfo& b)
+bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
+                std::map<int, std::vector<NodeInfo>>& ec_oper,
+                const NodeInfo& a,
+                const NodeInfo& b)
 {
     if (a.equivClassId_ass  != b.equivClassId_ass)
     {
@@ -559,7 +551,9 @@ bool sameClass(NodeInfo a, NodeInfo b)
 }
 
 
-Node sortOp1(NodeInfo ni)
+Node sortOp1(std::map<int, std::vector<NodeInfo>>& ec_ass,
+             std::map<int, std::vector<NodeInfo>>& ec_oper,
+             NodeInfo ni)
 {
     Node n = ni.node;
     if (n.isVar() || n.isConst())
@@ -569,7 +563,8 @@ Node sortOp1(NodeInfo ni)
     std::vector<NodeInfo> child;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
-        child.push_back(getNodeInfo(sortOp1(getNodeInfo(n[i], -1, -1)), -1, -1));
+        child.push_back(getNodeInfo(
+          sortOp1(ec_ass, ec_oper, getNodeInfo(n[i], -1, -1)), -1, -1));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -594,7 +589,11 @@ Node sortOp1(NodeInfo ni)
             ec_oper[ecId_operands].push_back(child[i]);
         }
 
-        std::sort(child.begin() + commutative, child.end(), operandsCmpR1);
+        std::sort(child.begin() + commutative,
+                  child.end(),
+                  [&ec_ass, &ec_oper](const auto& a, const auto& b) {
+                    return operandsCmpR1(ec_ass, ec_oper, a, b);
+                  });
 
     }
 
@@ -618,7 +617,11 @@ Node sortOp1(NodeInfo ni)
 
 
 
-Node sortOperands(NodeInfo ni) {
+Node sortOperands(
+    std::map<int, std::vector<NodeInfo>>& ec_ass,
+    std::map<int, std::vector<NodeInfo>>& ec_oper,
+    NodeInfo ni) 
+{
     Node n = ni.node;
     if (n.isVar() || n.isConst()) {
         return n;
@@ -683,7 +686,12 @@ Node sortOperands(NodeInfo ni) {
                 ec_oper[ecId_operands].push_back(child[i]);
             }
 
-            std::sort(child.begin() + commutative, child.end(), operandsCmpR1);
+
+        std::sort(child.begin() + commutative, child.end(),
+          [&ec_ass, &ec_oper](const NodeInfo& nia, const NodeInfo& nib) {
+              return operandsCmpR1(ec_ass, ec_oper, nia, nib);
+          });
+
         }
 
         std::vector<Node> operands;
@@ -707,7 +715,9 @@ Node sortOperands(NodeInfo ni) {
 
 
 
-Node sortOp3(NodeInfo ni)
+Node sortOp3(std::map<int, std::vector<NodeInfo>>& ec_ass,
+             std::map<int, std::vector<NodeInfo>>& ec_oper,
+             NodeInfo ni)
 {
     Node n = ni.node;
     if (n.isVar() || n.isConst())
@@ -719,7 +729,7 @@ Node sortOp3(NodeInfo ni)
     {
         int ecId_ass = ni.equivClassId_ass;
         NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
-        child.push_back(getNodeInfo(sortOp3(curr), ecId_ass, -1));
+        child.push_back(getNodeInfo(sortOp3(ec_ass, ec_oper, curr), ecId_ass, -1));
     } 
     int commutative = isCommutative(n.getKind());
 
@@ -744,7 +754,11 @@ Node sortOp3(NodeInfo ni)
             ec_oper[ecId_operands].push_back(child[i]);
         }
 
-        std::sort(child.begin() + commutative, child.end(), operandsCmpR3);
+        std::sort(child.begin() + commutative,
+                  child.end(),
+                  [&ec_ass, &ec_oper](const auto& a, const auto& b) {
+                    return operandsCmpR3(ec_ass, ec_oper, a, b);
+                  });
     }
 
 
@@ -976,7 +990,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     for (NodeInfo ni: prv_nodeInfos)
     {
-        Node curr = sortOperands(ni);
+        Node curr = sortOperands(d_ec_ass, d_ec_oper, ni);
         nodeInfos.push_back(getNodeInfo(curr, -1, -1));
     }
     /////////////////////////////////////////////////////////////
@@ -999,7 +1013,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // Step 4: Calculate equivalence classes for assertions
     unsigned ecId_ass = 1;
     nodeInfos[0].equivClassId_ass = ecId_ass;
-    ec_ass[ecId_ass].push_back(nodeInfos[0]);
+    d_ec_ass[ecId_ass].push_back(nodeInfos[0]);
     // std::cout << "EC1" << std::endl;
     // std::cout << nodeInfos[0].node << std::endl;
     for (size_t i = 1; i < nodeInfos.size(); i++)
@@ -1011,7 +1025,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
             // std::cout << "EC" << ecId_ass << std::endl;
         }
         nodeInfos[i].equivClassId_ass = ecId_ass;
-        ec_ass[ecId_ass].push_back(nodeInfos[i]);
+        d_ec_ass[ecId_ass].push_back(nodeInfos[i]);
         // std::cout << nodeInfos[i].encoding << std::endl;
         // std::cout << nodeInfos[i].node << std::endl;
     }
@@ -1031,7 +1045,11 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         nodeInfos.push_back(getNodeInfo(ni.node, ni.equivClassId_ass, -1));
     }
-    sort(nodeInfos.begin(), nodeInfos.end(), complexCmp);
+    sort(nodeInfos.begin(),
+         nodeInfos.end(),
+         [this](const auto& a, const auto& b) {
+           return complexCmp(d_ec_ass, d_ec_oper, a, b);
+         });
     // std::cout << "SORTED ASSERTIONS" << std::endl;
     /////////////////////////////////////////////////////////////
 
