@@ -132,35 +132,7 @@ bool nodeInfoCmp(const NodeInfo& a, const NodeInfo& b)
     return a.encoding < b.encoding;
 }
 
-bool operandsCmpR2(const Node& a, const Node& b)
-{
-    // std::cout << "Comparing " << a << " and " << b << std::endl;
-    std::string sa, sb;
-    if (a.isVar() || a.isConst())
-    {
-        sa = a.toString();
-    }
-    else
-    {
-        // cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
-        // sa = cvc5::internal::kind::toString(k);
-        sa = a.toString();
-    }
 
-    if (b.isVar() || b.isConst())
-    {
-        sb = b.toString();
-    }
-    else
-    {
-        // cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
-        // sb = cvc5::internal::kind::toString(k);
-        sb = b.toString();
-    }
-    // std::cout << "sa=" << sa << ", sb=" << sb << std::endl;
-    // std::cout << "*****" << std::endl;
-    return sa < sb;
-}
 
 
 bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
@@ -168,40 +140,8 @@ bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
                    const NodeInfo& nia,
                    const NodeInfo& nib)
  {
-    // std::cout << "Comparing " << nia.node << " and " << nib.node << std::endl;
     Node a = nia.node, b = nib.node;
-    // std::string sa, sb;
-    // if (a.isVar())
-    // {
-    //     sa = "V";
-    // }
-    // else if (a.isConst())
-    // {
-    //     sa = a.toString();
-    // }
-    // else
-    // {
-    //     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(a.getKind());
-    //     sa = cvc5::internal::kind::toString(k);
-    // }
 
-    // if (b.isVar())
-    // {
-    //     sb = "V";
-    // } 
-    // else if (b.isConst())
-    // {
-    //     sb = b.toString();
-    // }
-    // else
-    // {
-    //     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(b.getKind());
-    //     sb = cvc5::internal::kind::toString(k);
-    // }
-    // if (sa != sb)
-    // {
-    //     return sa < sb;
-    // }
     if (nia.encoding != nib.encoding)
     {
         return nia.encoding < nib.encoding;
@@ -262,124 +202,6 @@ bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
 
     return false;
 }
-
-
-
-
-bool operandsCmpR3(std::map<int, std::vector<NodeInfo>>& ec_ass,
-                   std::map<int, std::vector<NodeInfo>> ec_oper,
-                   const NodeInfo& nia,
-                   const NodeInfo& nib)
- {
-    Node a = nia.node, b = nib.node;
-    if (nia.encoding != nib.encoding)
-    {
-        return nia.encoding < nib.encoding;
-    }
-    AssertArgument(nia.pat.size() == nib.pat.size(), nia.toString() + " and " + nib.toString() + " have the same encoding but different variable sequence size");
-    for (size_t i = 0; i < nia.pat.size(); i++)
-    {
-        if (nia.pat[i] != nib.pat[i])
-        {
-            return nia.pat[i] < nib.pat[i];
-        }
-    }
-
-    // Now we know that they belong to the same equivalent class
-    AssertArgument(nia.equivClassId_operands == nib.equivClassId_operands, nia.toString() + " and " + nib.toString() + " have the same encoding and pattern but different equivalent class id for operands");
-
-    // Calculate super-pattern of diff pairs of variables in the next equivalent classes of OPERANDS and compare them
-
-    for (int i = 0; i < nia.varNames.size(); ++i)
-    {
-        if (nia.varNames[i] == nib.varNames[i])
-        {
-            continue;
-        }
-        std::string var_a = nia.varNames[i], var_b = nib.varNames[i]; // first different variables in a and b
-        
-        int ecId_oper = nia.equivClassId_operands; // = b.equivClassId_operands
-        std::vector<int> spat_a, spat_b;
-        for (int j = ecId_oper; ec_oper[j].size() > 0; ++j)
-        {
-            std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec_oper[j])
-            {
-                pat_j_a.push_back(getRole(var_a, curr));
-                pat_j_b.push_back(getRole(var_b, curr));
-            }
-            sort(pat_j_a.begin(), pat_j_a.end());
-            sort(pat_j_b.begin(), pat_j_b.end());
-            // Append pattern of var_a in ec_oper[j] to spat_a
-            for (size_t k = 0; k < pat_j_a.size(); k++)
-            {
-                spat_a.push_back(pat_j_a[k]);
-                spat_b.push_back(pat_j_b[k]);
-            }
-        }
-
-        // Compare the super-patterns
-        size_t n = spat_a.size();
-        for (size_t j = 0; j < n; j++)
-        {
-            if (spat_a[j] != spat_b[j])
-            {
-                return spat_a[j] < spat_b[j];
-            }
-        }
-    }
-
-
-
-
-    // Calculate super-pattern of diff pairs of variables in the next equivalent classes of ASSERTIONS and compare them
-    
-
-    for (int i = 0; i < nia.varNames.size(); ++i)
-    {
-        if (nia.varNames[i] == nib.varNames[i])
-        {
-            continue;
-        }
-        std::string var_a = nia.varNames[i], var_b = nib.varNames[i]; // first different variables in a and b
-
-        int ecId_ass = nia.equivClassId_ass; // = b.equivClassId_ass
-        std::vector<int> spat_a, spat_b;
-        for (int j = ecId_ass; ec_ass[j].size() > 0; ++j)
-        {
-            std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec_ass[j])
-            {
-                pat_j_a.push_back(getRole(var_a, curr));
-                pat_j_b.push_back(getRole(var_b, curr));
-            }
-            sort(pat_j_a.begin(), pat_j_a.end());
-            sort(pat_j_b.begin(), pat_j_b.end());
-            // Append pattern of var_a in ec_ass[j] to spat_a
-            for (size_t k = 0; k < pat_j_a.size(); k++)
-            {
-                spat_a.push_back(pat_j_a[k]);
-                spat_b.push_back(pat_j_b[k]);
-            }
-        }
-
-        // Compare the super-patterns
-        size_t n = spat_a.size();
-        for (size_t j = 0; j < n; j++)
-        {
-            if (spat_a[j] != spat_b[j])
-            {
-                return spat_a[j] < spat_b[j];
-            }
-        }
-
-
-    }
-
-    // Should we not care at this point? Only Clark knows. 
-    return false;
-}
-
 
 
 
@@ -551,71 +373,6 @@ bool sameClass(NodeInfo a, NodeInfo b)
 }
 
 
-Node sortOp1(std::map<int, std::vector<NodeInfo>>& ec_ass,
-             std::map<int, std::vector<NodeInfo>>& ec_oper,
-             NodeInfo ni)
-{
-    Node n = ni.node;
-    if (n.isVar() || n.isConst())
-    {
-        return n;
-    }
-    std::vector<NodeInfo> child;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        child.push_back(getNodeInfo(
-          sortOp1(ec_ass, ec_oper, getNodeInfo(n[i], -1, -1)), -1, -1));
-    } 
-    int commutative = isCommutative(n.getKind());
-
-
-    if (commutative != -1)
-    {
-
-        // Calculate equivalence classes for the children (operands)
-        ec_oper.clear();
-        std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
-
-        int ecId_operands = 1;
-        child[commutative].equivClassId_operands = ecId_operands;
-        ec_oper[ecId_operands].push_back(child[commutative]);
-        for (size_t i = commutative + 1; i < child.size(); i++)
-        {
-            if (!sameClass(child[i], child[i - 1]))
-            {
-                ecId_operands++;
-            }
-            child[i].equivClassId_operands = ecId_operands;
-            ec_oper[ecId_operands].push_back(child[i]);
-        }
-
-        std::sort(child.begin() + commutative,
-                  child.end(),
-                  [&ec_ass, &ec_oper](const auto& a, const auto& b) {
-                    return operandsCmpR1(ec_ass, ec_oper, a, b);
-                  });
-
-    }
-
-
-
-    std::vector<Node> operands;
-    for (size_t i = 0; i < child.size(); i++)
-    {
-        operands.push_back(child[i].node);
-    }
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        operands.insert(operands.begin(), n.getOperator());
-    }
-
-
-    return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
-}
-
-
-
 
 Node sortOperands(
     std::map<int, std::vector<NodeInfo>>& ec_ass,
@@ -709,74 +466,6 @@ Node sortOperands(
     }
 
     return processedNodes[n];
-}
-
-
-
-
-
-Node sortOp3(std::map<int, std::vector<NodeInfo>>& ec_ass,
-             std::map<int, std::vector<NodeInfo>>& ec_oper,
-             NodeInfo ni)
-{
-    Node n = ni.node;
-    if (n.isVar() || n.isConst())
-    {
-        return n;
-    }
-    std::vector<NodeInfo> child;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
-    {
-        int ecId_ass = ni.equivClassId_ass;
-        NodeInfo curr = getNodeInfo(n[i], ecId_ass, -1);
-        child.push_back(getNodeInfo(sortOp3(ec_ass, ec_oper, curr), ecId_ass, -1));
-    } 
-    int commutative = isCommutative(n.getKind());
-
-
-      
-    if (commutative != -1)
-    {
-        // Calculate equivalence classes for the children (operands)
-        ec_oper.clear();
-        std::sort(child.begin() + commutative, child.end(), equivClassCalcCmp);
-
-        int ecId_operands = 1;
-        child[commutative].equivClassId_operands = ecId_operands;
-        ec_oper[ecId_operands].push_back(child[commutative]);
-        for (size_t i = commutative + 1; i < child.size(); i++)
-        {
-            if (!sameClass(child[i], child[i - 1]))
-            {
-                ecId_operands++;
-            }
-            child[i].equivClassId_operands = ecId_operands;
-            ec_oper[ecId_operands].push_back(child[i]);
-        }
-
-        std::sort(child.begin() + commutative,
-                  child.end(),
-                  [&ec_ass, &ec_oper](const auto& a, const auto& b) {
-                    return operandsCmpR3(ec_ass, ec_oper, a, b);
-                  });
-    }
-
-
-
-    std::vector<Node> operands;
-    for (size_t i = 0; i < child.size(); i++)
-    {
-        operands.push_back(child[i].node);
-    }
-
-    if (n.getMetaKind() == metakind::PARAMETERIZED)
-    {
-        operands.insert(operands.begin(), n.getOperator());
-    }
-
-
-    return NodeManager::currentNM()->mkNode(n.getKind(), operands);   
-
 }
 
 
