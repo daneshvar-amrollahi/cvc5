@@ -42,7 +42,7 @@ Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
     d_statistics(statisticsRegistry())
     {};
 
-void dfs(Node n, std::string& encoding, std::vector<std::string> &varNames)
+void dfs(const Node& n, std::string& encoding, std::vector<std::string>& varNames)
 {
     if (n.isVar())
     {
@@ -78,7 +78,7 @@ int getRole(std::string var, NodeInfo n)
     return 0;
 }
 
-NodeInfo getNodeInfo(Node n, unsigned ecId_ass, unsigned ecId_op)
+NodeInfo getNodeInfo(const Node& n, unsigned ecId_ass, unsigned ecId_op)
 {
     std::string encoding = "";
     std::vector<std::string> varNames; 
@@ -160,7 +160,7 @@ bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
     AssertArgument(nia.equivClassId_operands == nib.equivClassId_operands, nia.toString() + " and " + nib.toString() + " have the same encoding and pattern but different equivalent class id for operands");
 
     // Calculate super-pattern of diff pairs of variables in the next equivalent classes and compare them
-    for (int i = 0; i < nia.varNames.size(); ++i)
+    for (size_t i = 0; i < nia.varNames.size(); ++i)
     {
         if (nia.varNames[i] == nib.varNames[i])
         {
@@ -240,7 +240,7 @@ bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
     // Calculate super-pattern of diff pairs of variables in the next equivalent classes and compare them
     int ecId_ass = a.equivClassId_ass; // also b.equivClassId_ass
     std::vector<int> spat_a, spat_b;
-    for (int i = 0; i < a.varNames.size(); ++i)
+    for (size_t i = 0; i < a.varNames.size(); ++i)
     {
         if (a.varNames[i] == b.varNames[i])
         {
@@ -374,10 +374,9 @@ bool sameClass(NodeInfo a, NodeInfo b)
 
 
 
-Node sortOperands(
-    std::map<int, std::vector<NodeInfo>>& ec_ass,
-    std::map<int, std::vector<NodeInfo>>& ec_oper,
-    NodeInfo ni) 
+Node sortOperands(std::map<int, std::vector<NodeInfo>>& ec_ass,
+                  std::map<int, std::vector<NodeInfo>>& ec_oper,
+                  const NodeInfo& ni)
 {
     Node n = ni.node;
     if (n.isVar() || n.isConst()) {
@@ -541,12 +540,11 @@ int numDigits(int n)
 
 
 
-Node rename(
-    Node n, 
-    std::map<std::string, Node>& freeVar2node, 
-    std::map<std::string, Node>& boundVar2node, 
-    NodeManager* nodeManager,
-    PreprocessingPassContext* d_preprocContext)
+Node rename(const Node& n, 
+            std::map<std::string, Node>& freeVar2node, 
+            std::map<std::string, Node>& boundVar2node, 
+            NodeManager* nodeManager,
+            PreprocessingPassContext* d_preprocContext)
 {
     std::map<Node, Node> normalized;
     std::stack<Node> stack1, stack2;
