@@ -259,23 +259,10 @@ bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
                 pat_j_b.push_back(getRole(var_b, curr));
             }
 
-            // std::cout << "j=" << j << std::endl;
-            // std::cout << "pat_a: ";
-            // for (size_t k = 0; k < pat_j_a.size(); k++)
-            // {
-            //     std::cout << pat_j_a[k] << " ";
-            // }
-            // std::cout << std::endl;
-            // std::cout << "pat_b: ";
-            // for (size_t k = 0; k < pat_j_b.size(); k++)
-            // {
-            //     std::cout << pat_j_b[k] << " ";
-            // }
-            // std::cout << std::endl;
 
             sort(pat_j_a.begin(), pat_j_a.end());
             sort(pat_j_b.begin(), pat_j_b.end());
-            // Append pattern of var_a in ec_ass[j] to spat_a
+
             for (size_t k = 0; k < pat_j_a.size(); k++)
             {
                 spat_a.push_back(pat_j_a[k]);
@@ -294,19 +281,7 @@ bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
         }
     }
 
-    // std::cout << "Super-patterns are the same for " << a.node << " and " << b.node << std::endl;
-    // for (size_t i = 0; i < spat_a.size(); i++)
-    // {
-    //     std::cout << spat_a[i] << " ";
-    // }
-    // std::cout << std::endl;
-    // for (size_t i = 0; i < spat_b.size(); i++)
-    // {
-    //     std::cout << spat_b[i] << " ";
-    // }
-    // std::cout << std::endl;
 
-    // What happens here?
     return false;   
 }
 
@@ -316,9 +291,9 @@ bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
 // if true, else -1.
 int isCommutative(cvc5::internal::Kind k)
 {
-    if (k == cvc5::internal::Kind::ADD) // ToDo: Other than arithmetic?
+    if (k == cvc5::internal::Kind::ADD) 
         return 0;
-    if (k == cvc5::internal::Kind::MULT) // ToDo: Other than arithmetic?
+    if (k == cvc5::internal::Kind::MULT) 
         return 0;
     if (k == cvc5::internal::Kind::AND)
         return 0;
@@ -328,7 +303,7 @@ int isCommutative(cvc5::internal::Kind k)
         return 0;
     if (k == cvc5::internal::Kind::DISTINCT)
         return 0;
-    if (k == cvc5::internal::Kind::EQUAL) // ToDo: How about difference logic
+    if (k == cvc5::internal::Kind::EQUAL) 
         return 0;
     if (k == cvc5::internal::Kind::BITVECTOR_AND)
         return 0;

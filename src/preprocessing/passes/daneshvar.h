@@ -37,10 +37,10 @@ struct NodeInfo
   unsigned equivClassId_operands;
   NodeInfo() {}
   NodeInfo(Node n,
-           std::string e,
-           std::vector<int> p,
-           std::vector<std::string> vn,
-           std::map<std::string, int> r,
+           const std::string& e,                      
+           const std::vector<int>& p,                 
+           const std::vector<std::string>& vn,        
+           const std::map<std::string, int>& r,
            unsigned ecId_ass,
            unsigned ecId_op)
       : node(n),
