@@ -174,7 +174,7 @@ bool operandsCmpR1(std::map<int, std::vector<NodeInfo>>& ec_ass,
         for (int j = ecId_operands; ec_oper[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec_oper[j])
+            for (const NodeInfo& curr : ec_oper[j])
             {
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
