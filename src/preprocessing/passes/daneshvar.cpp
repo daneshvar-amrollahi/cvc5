@@ -71,9 +71,10 @@ void dfs(const Node& n, std::string& encoding, std::vector<std::string>& varName
 
 int getRole(std::string var, NodeInfo n)
 {
-    if (n.role.find(var) != n.role.end())
+    auto it = n.role.find(var);
+    if (it != n.role.end())
     {
-        return n.role[var];
+        return it->second;
     }
     return 0;
 }
