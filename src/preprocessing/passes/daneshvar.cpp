@@ -254,7 +254,7 @@ bool complexCmp(std::map<int, std::vector<NodeInfo>>& ec_ass,
         for (int j = ecId_ass; ec_ass[j].size() > 0; ++j)
         {
             std::vector<int> pat_j_a, pat_j_b;
-            for (NodeInfo curr : ec_ass[j])
+            for (const NodeInfo& curr : ec_ass[j])
             {
                 pat_j_a.push_back(getRole(var_a, curr));
                 pat_j_b.push_back(getRole(var_b, curr));
