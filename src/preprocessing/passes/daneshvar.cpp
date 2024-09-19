@@ -330,7 +330,7 @@ int isCommutative(cvc5::internal::Kind k)
     return -1;
 }
 
-bool sameClass(NodeInfo a, NodeInfo b)
+bool sameClass(const NodeInfo& a, const NodeInfo& b)
 {
     if (a.encoding != b.encoding)
     {
