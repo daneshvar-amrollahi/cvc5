@@ -136,6 +136,9 @@ bool ProcessAssertions::apply(AssertionPipeline& ap)
       << "ProcessAssertions::processAssertions() : post-definition-expansion"
       << endl;
 
+
+  applyPass("daneshvar", ap);
+
   Trace("smt") << " assertions     : " << ap.size() << endl;
 
   if (options().quantifiers.globalNegate)
