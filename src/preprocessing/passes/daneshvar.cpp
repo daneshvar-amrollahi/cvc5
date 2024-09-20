@@ -516,6 +516,8 @@ int numDigits(int n)
 
 
 
+
+/*
 Node rename(const Node& n, 
             std::map<std::string, Node>& freeVar2node, 
             std::map<std::string, Node>& boundVar2node, 
@@ -621,6 +623,139 @@ Node rename(const Node& n,
 
     return normalized[n];
 }
+*/
+
+
+
+
+Node rename(const Node& n, 
+            std::map<std::string, Node>& freeVar2node, 
+            std::map<std::string, Node>& boundVar2node, 
+            NodeManager* nodeManager,
+            PreprocessingPassContext* d_preprocContext)
+{
+    std::map<Node, Node> normalized;
+    // Stack entries consist of the node and a boolean indicating if it has been visited
+    std::stack<std::pair<Node, bool>> stack;
+    std::stack<std::map<std::string, Node>> scopeStack;
+    
+    // Initialize a global variable counter for bound variables
+    static int globalVarCounter = 0;
+
+    // Initialize the stack with the root node, not visited
+    stack.push({n, false});
+    // Initialize the scope stack with the global scope
+    scopeStack.push(boundVar2node);
+
+    while (!stack.empty()) {
+        auto [current, visited] = stack.top();
+        stack.pop();
+
+        if (visited) {
+            // After children are processed
+            if (current.isConst()) {
+                normalized[current] = current;
+                continue;
+            }
+
+            if (current.isVar()) {
+                if (current.getKind() == cvc5::internal::Kind::BOUND_VARIABLE) {
+                    auto& currentScope = scopeStack.top();
+
+                    if (currentScope.find(current.toString()) != currentScope.end()) {
+                        normalized[current] = currentScope[current.toString()];
+                    } else {
+                        int id = globalVarCounter++;
+                        std::string new_var_name = "u" + std::string(5 - numDigits(id), '0') + std::to_string(id);
+                        Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
+                        currentScope[current.toString()] = ret;
+                        normalized[current] = ret;
+                    }
+                } else {
+                    if (freeVar2node.find(current.toString()) != freeVar2node.end()) {
+                        normalized[current] = freeVar2node[current.toString()];
+                    } else {
+                        std::vector<Node> cnodes;
+                        int id = freeVar2node.size();
+                        std::string new_var_name = "v" + std::string(5 - numDigits(id), '0') + std::to_string(id);
+                        cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
+                        Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
+                        cnodes.push_back(gt);
+                        Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(SkolemFunId::INPUT_VARIABLE, cnodes);
+                        freeVar2node[current.toString()] = ret;
+                        normalized[current] = ret;
+                        d_preprocContext->addSubstitution(current, ret);
+                    }
+                }
+                continue;
+            }
+
+            // Prepare children for node creation
+            std::vector<Node> children;
+            if (current.getKind() == cvc5::internal::Kind::APPLY_UF) {
+                children.push_back(normalized[current.getOperator()]);
+            } else if (current.getMetaKind() == metakind::PARAMETERIZED) {
+                children.push_back(current.getOperator());
+            }
+
+            for (size_t i = 0; i < current.getNumChildren(); i++) {
+                children.push_back(normalized[current[i]]);
+            }
+
+            // Handle quantifiers (FORALL, EXISTS)
+            if (current.getKind() == cvc5::internal::Kind::FORALL || 
+                current.getKind() == cvc5::internal::Kind::EXISTS) {
+                // Pop the scope after processing
+                scopeStack.pop();
+            }
+
+            Node ret = nodeManager->mkNode(current.getKind(), children);
+            normalized[current] = ret;
+
+        } else {
+            // Before processing children
+            if (current.isConst() || current.isVar()) {
+                // No children to process
+                stack.push({current, true});
+                continue;
+            }
+
+            // Handle quantifiers (FORALL, EXISTS) by creating a new scope
+            if (current.getKind() == cvc5::internal::Kind::FORALL || 
+                current.getKind() == cvc5::internal::Kind::EXISTS) {
+                // Create a new scope
+                std::map<std::string, Node> newScope = scopeStack.top(); // Copy the current scope
+                Node bound_vars = current[0];
+
+                for (size_t i = 0; i < bound_vars.getNumChildren(); i++) {
+                    // Remove the bound variable from the parent scope
+                    newScope.erase(bound_vars[i].toString());
+                }
+
+                scopeStack.push(newScope); // Push the new scope onto the stack
+            }
+
+            // Mark the current node as visited and push back onto the stack
+            stack.push({current, true});
+
+            // Push children onto the stack
+            if (current.getKind() == cvc5::internal::Kind::APPLY_UF) {
+                stack.push({current.getOperator(), false});
+            } else if (current.getMetaKind() == metakind::PARAMETERIZED) {
+                // For parameterized nodes, the operator is treated separately
+                // No need to push the operator as it's already included in children
+            }
+
+            // Push children in reverse order to maintain left-to-right processing
+            for (int i = current.getNumChildren() - 1; i >= 0; i--) {
+                stack.push({current[i], false});
+            }
+        }
+    }
+
+    return normalized[n];
+}
+
 
 
 
