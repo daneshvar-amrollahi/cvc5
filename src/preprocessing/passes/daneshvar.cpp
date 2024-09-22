@@ -45,7 +45,13 @@ Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
 
 
 
-void dfs(const Node&n, std::map<Node, uint32_t>& subtreeCache, std::map<std::string, uint32_t>& symbolMap, std::map<uint32_t, std::vector<std::string>>& subtreePattern)
+void dfs(
+    const Node&n, 
+    std::map<Node, uint32_t>& subtreeCache, // key: node, value: subtree id
+    std::map<std::string, uint32_t>& symbolMap, // key: symbol, value: id (color)
+    std::map<uint32_t, std::vector<std::string>>& subtreePattern, // key: subtree id, value: pattern (each element is a symbol color or subtree id)
+    std::map<uint32_t, std::vector<std::string>>& symbolList // key: subtree id, value: list of symbols in the subtree
+    )
 {
     if (n.isVar())
     {
@@ -55,6 +61,7 @@ void dfs(const Node&n, std::map<Node, uint32_t>& subtreeCache, std::map<std::str
             uint32_t id = symbolMap.size() + 1;
             symbolMap[symbol] = id;
         }
+        
         return;
     }
 
@@ -62,6 +69,7 @@ void dfs(const Node&n, std::map<Node, uint32_t>& subtreeCache, std::map<std::str
     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(n.getKind());
     std::string boz = cvc5::internal::kind::toString(k);
     std::vector<std::string> children;
+    std::vector<std::string> symbols;
     for (size_t i = 0; i < n.getNumChildren(); i++)
     {
         if (n[i].isConst())
@@ -74,19 +82,24 @@ void dfs(const Node&n, std::map<Node, uint32_t>& subtreeCache, std::map<std::str
         {
             if (symbolMap.find(n[i].toString()) == symbolMap.end())
             {
-                dfs(n[i], subtreeCache, symbolMap, subtreePattern);
+                dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
             }
 
             children.push_back(std::to_string(symbolMap[n[i].toString()]));
+            symbols.push_back(n[i].toString());
             continue;
         }
         
 
         if (subtreeCache.find(n[i]) == subtreeCache.end())
         {
-            dfs(n[i], subtreeCache, symbolMap, subtreePattern);
+            dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
         } 
         children.push_back("S" + std::to_string(subtreeCache[n[i]]));
+        for (auto& elem : symbolList[subtreeCache[n[i]]])
+        {
+            symbols.push_back(elem);
+        }
         
     }
     
@@ -94,6 +107,7 @@ void dfs(const Node&n, std::map<Node, uint32_t>& subtreeCache, std::map<std::str
     subtreeCache[n] = id;
     std::cout << "Inserting " << n << " with id " << id << std::endl;
     subtreePattern[id] = children;
+    symbolList[id] = symbols;
 }
 
 
@@ -120,9 +134,9 @@ void getNodeInfo(const Node& n)
     std::map<Node, uint32_t> subtreeCache;
     std::map<std::string, uint32_t> symbolMap;
     std::map<uint32_t, std::vector<std::string>> subtreePattern;
-
-    // Fills the above maps
-    dfs(n, subtreeCache, symbolMap, subtreePattern);
+    std::map<uint32_t, std::vector<std::string>> symbolList;
+    // Fills the above maps and vectors
+    dfs(n, subtreeCache, symbolMap, subtreePattern, symbolList);
 
     // std::cout << "Subtree Cache: " << std::endl;
     // for (auto& [node, id] : subtreeCache)
@@ -158,12 +172,13 @@ void getNodeInfo(const Node& n)
         encoding += ";";
     }
     std::cout << "Encoding: " << encoding << std::endl;
-    
 
+
+    uint32_t treeId = subtreeCache[n];
 
     // Pattern
     std::vector<uint32_t> pat;
-    auto treeId = subtreeCache[n];
+    
     getPattern(treeId, subtreePattern, pat);
     std::cout << "Pattern: ";
     for (auto& elem : pat)
@@ -171,6 +186,14 @@ void getNodeInfo(const Node& n)
         std::cout << elem << " ";
     }
     std::cout << std::endl;
+
+    // Symbols
+    std::vector<std::string> symbols = symbolList[treeId];
+    std::cout << "Symbols: ";
+    for (auto& symbol : symbols)
+    {
+        std::cout << symbol << " ";
+    }
 }
 
 

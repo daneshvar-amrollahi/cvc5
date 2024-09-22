@@ -36,7 +36,7 @@ struct NodeInfo
   std::string encoding;                 // Concat elements in subtreePattern           
   std::vector<uint32_t> pat;            // Can be obtained from subtreePattern
   std::vector<std::string> symbols;     // List of symbols in this node left to right 
-  std::map<std::string, uint32_t> role; // The role of a symbol in the pattern
+  std::map<std::string, uint32_t> role; // The role (index of first occurence) of a symbol in the pattern
   uint32_t equivClass;
   NodeInfo() {}
 
