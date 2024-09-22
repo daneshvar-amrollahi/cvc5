@@ -29,29 +29,38 @@ namespace passes {
 struct NodeInfo
 {
   Node node;
-  std::string encoding;
-  std::vector<int> pat;
-  std::vector<std::string> varNames;
-  std::map<std::string, int> role;
-  unsigned equivClassId_ass;
-  unsigned equivClassId_operands;
+  std::map<Node, uint32_t> subtreeCache;
+  std::map<std::string, uint32_t> symbolMap; // {A: 1, B: 2, C: 3}
+  std::map<uint32_t, std::vector<std::string>> subtreePattern; // {1: {1}, 2: {1, 2}, 3: {S1, S2}}
+
+  std::string encoding;                 // Concat elements in subtreePattern           
+  std::vector<uint32_t> pat;            // Can be obtained from subtreePattern
+  std::vector<std::string> symbols;     // List of symbols in this node left to right 
+  std::map<std::string, uint32_t> role; // The role of a symbol in the pattern
+  uint32_t equivClass;
   NodeInfo() {}
+
   NodeInfo(Node n,
-           const std::string& e,                      
-           const std::vector<int>& p,                 
-           const std::vector<std::string>& vn,        
-           const std::map<std::string, int>& r,
-           unsigned ecId_ass,
-           unsigned ecId_op)
+          const std::map<Node, uint32_t>& sc,
+          const std::map<std::string, uint32_t>& sm,
+          const std::map<uint32_t, std::vector<std::string>>& sp,
+          const std::string& e,
+          const std::vector<uint32_t>& p,
+          const std::vector<std::string>& s,
+          const std::map<std::string, uint32_t>& r,
+          uint32_t ec)
       : node(n),
+        subtreeCache(sc),
+        symbolMap(sm),
+        subtreePattern(sp),
         encoding(e),
         pat(p),
-        varNames(vn),
+        symbols(s),
         role(r),
-        equivClassId_ass(ecId_ass),
-        equivClassId_operands(ecId_op)
+        equivClass(ec)
   {
   }
+
 };
 
 
@@ -78,8 +87,6 @@ private:
   };
 
   Statistics d_statistics;
-  std::map<int, std::vector<NodeInfo>> d_ec_ass;
-  std::map<int, std::vector<NodeInfo>> d_ec_oper;
 };
 
 }  // namespace passes
