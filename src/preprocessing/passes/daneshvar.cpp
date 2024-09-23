@@ -48,70 +48,185 @@ Daneshvar::Daneshvar(PreprocessingPassContext* preprocContext)
 
 
 
-void dfs(
-    const Node&n, 
-    std::map<Node, uint32_t>& subtreeCache, // key: node, value: subtree id
-    std::map<std::string, uint32_t>& symbolMap, // key: symbol, value: id (color)
-    std::map<uint32_t, std::vector<std::string>>& subtreePattern, // key: subtree id, value: pattern (each element is a symbol color or subtree id)
-    std::map<uint32_t, std::vector<std::string>>& symbolList // key: subtree id, value: list of symbols in the subtree
-    )
-{
-    if (n.isVar())
-    {
-        std::string symbol = n.toString();
-        if (symbolMap.find(symbol) == symbolMap.end())
-        {
-            uint32_t id = symbolMap.size() + 1;
-            symbolMap[symbol] = id;
-        }
+// void dfs(
+//     const Node&n, 
+//     std::map<Node, uint32_t>& subtreeCache, // key: node, value: subtree id
+//     std::map<std::string, uint32_t>& symbolMap, // key: symbol, value: id (color)
+//     std::map<uint32_t, std::vector<std::string>>& subtreePattern, // key: subtree id, value: pattern (each element is a symbol color or subtree id)
+//     std::map<uint32_t, std::vector<std::string>>& symbolList // key: subtree id, value: list of symbols in the subtree
+//     )
+// {
+//     if (n.isVar())
+//     {
+//         std::string symbol = n.toString();
+//         if (symbolMap.find(symbol) == symbolMap.end())
+//         {
+//             uint32_t id = symbolMap.size() + 1;
+//             symbolMap[symbol] = id;
+//         }
         
-        return;
-    }
+//         return;
+//     }
 
 
-    cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(n.getKind());
-    std::string boz = cvc5::internal::kind::toString(k);
-    std::vector<std::string> children;
-    std::vector<std::string> symbols;
-    for (size_t i = 0; i < n.getNumChildren(); i++)
+//     cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(n.getKind());
+//     std::string boz = cvc5::internal::kind::toString(k);
+//     std::vector<std::string> children;
+//     std::vector<std::string> symbols;
+//     for (size_t i = 0; i < n.getNumChildren(); i++)
+//     {
+//         if (n[i].isConst())
+//         {
+//             continue;
+//         }
+
+        
+//         if (n[i].isVar())
+//         {
+//             if (symbolMap.find(n[i].toString()) == symbolMap.end())
+//             {
+//                 dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
+//             }
+
+//             children.push_back(std::to_string(symbolMap[n[i].toString()]));
+//             symbols.push_back(n[i].toString());
+//             continue;
+//         }
+        
+
+//         if (subtreeCache.find(n[i]) == subtreeCache.end())
+//         {
+//             dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
+//         } 
+//         children.push_back("S" + std::to_string(subtreeCache[n[i]]));
+//         for (auto& elem : symbolList[subtreeCache[n[i]]])
+//         {
+//             symbols.push_back(elem);
+//         }
+        
+//     }
+    
+//     uint32_t id = subtreeCache.size() + 1;
+//     subtreeCache[n] = id;
+//     // std::cout << "Inserting " << n << " with id " << id << std::endl;
+//     subtreePattern[id] = children;
+//     symbolList[id] = symbols;
+// }
+
+
+
+
+void dfs_iterative(
+    const Node& root,
+    std::map<Node, uint32_t>& subtreeCache,
+    std::map<std::string, uint32_t>& symbolMap,
+    std::map<uint32_t, std::vector<std::string>>& subtreePattern,
+    std::map<uint32_t, std::vector<std::string>>& symbolList)
+{
+    // Stack to hold nodes and a flag indicating if the node's children have been processed
+    std::stack<std::pair<Node, bool>> stack;
+    stack.push({root, false});
+
+    while (!stack.empty())
     {
-        if (n[i].isConst())
+        auto [n, processed] = stack.top();
+        stack.pop();
+
+        // Skip nodes that have already been processed
+        if (subtreeCache.find(n) != subtreeCache.end())
         {
             continue;
         }
 
-        
-        if (n[i].isVar())
+        if (!processed)
         {
-            if (symbolMap.find(n[i].toString()) == symbolMap.end())
+            if (n.isVar())
             {
-                dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
+                // Process variable nodes
+                std::string symbol = n.toString();
+                if (symbolMap.find(symbol) == symbolMap.end())
+                {
+                    uint32_t id = symbolMap.size() + 1;
+                    symbolMap[symbol] = id;
+                }
+            }
+            else
+            {
+                // Push the node back onto the stack to process after its children
+                stack.push({n, true});
+
+                // Process children
+                for (size_t i = 0; i < n.getNumChildren(); ++i)
+                {
+                    Node child = n[i];
+
+                    if (child.isConst())
+                    {
+                        continue;
+                    }
+
+                    if (child.isVar())
+                    {
+                        // Process variable child nodes
+                        std::string symbol = child.toString();
+                        if (symbolMap.find(symbol) == symbolMap.end())
+                        {
+                            uint32_t id = symbolMap.size() + 1;
+                            symbolMap[symbol] = id;
+                        }
+                    }
+                    else
+                    {
+                        // Push non-variable child nodes onto the stack if not already processed
+                        if (subtreeCache.find(child) == subtreeCache.end())
+                        {
+                            stack.push({child, false});
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Process the node after all its children have been processed
+            cvc5::internal::Kind k = static_cast<cvc5::internal::Kind>(n.getKind());
+            std::string kindStr = cvc5::internal::kind::toString(k);
+            std::vector<std::string> children;
+            std::vector<std::string> symbols;
+
+            for (size_t i = 0; i < n.getNumChildren(); ++i)
+            {
+                Node child = n[i];
+
+                if (child.isConst())
+                {
+                    continue;
+                }
+
+                if (child.isVar())
+                {
+                    std::string symbol = child.toString();
+                    children.push_back(std::to_string(symbolMap[symbol]));
+                    symbols.push_back(symbol);
+                }
+                else
+                {
+                    children.push_back("S" + std::to_string(subtreeCache[child]));
+                    const auto& childSymbols = symbolList[subtreeCache[child]];
+                    symbols.insert(symbols.end(), childSymbols.begin(), childSymbols.end());
+                }
             }
 
-            children.push_back(std::to_string(symbolMap[n[i].toString()]));
-            symbols.push_back(n[i].toString());
-            continue;
+            uint32_t id = subtreeCache.size() + 1;
+            subtreeCache[n] = id;
+            subtreePattern[id] = std::move(children);
+            symbolList[id] = std::move(symbols);
         }
-        
-
-        if (subtreeCache.find(n[i]) == subtreeCache.end())
-        {
-            dfs(n[i], subtreeCache, symbolMap, subtreePattern, symbolList);
-        } 
-        children.push_back("S" + std::to_string(subtreeCache[n[i]]));
-        for (auto& elem : symbolList[subtreeCache[n[i]]])
-        {
-            symbols.push_back(elem);
-        }
-        
     }
-    
-    uint32_t id = subtreeCache.size() + 1;
-    subtreeCache[n] = id;
-    // std::cout << "Inserting " << n << " with id " << id << std::endl;
-    subtreePattern[id] = children;
-    symbolList[id] = symbols;
 }
+
+
+
 
 
 void getPattern(uint32_t treeId, std::map<uint32_t, std::vector<std::string>>& subtreePattern, std::vector<uint32_t>& pat)
@@ -140,7 +255,7 @@ std::unique_ptr<NodeInfo> getNodeInfo(const Node& n, uint32_t id)
     std::map<uint32_t, std::vector<std::string>> symbolList;
 
     // Fills the above maps and vectors
-    dfs(n, subtreeCache, symbolMap, subtreePattern, symbolList);
+    dfs_iterative(n, subtreeCache, symbolMap, subtreePattern, symbolList);
 
     // Encoding
     std::string encoding;
@@ -344,7 +459,9 @@ PreprocessingPassResult Daneshvar::applyInternal(
 {
     TimerStat::CodeTimer codeTimer(d_statistics.d_passTime);
 
-    std::vector<std::unique_ptr<NodeInfo>> nodeInfos, prv_nodeInfos;
+    // std::cout << "STARTING DANESHVAR PASS" << std::endl; // Note to make sure not timing out on passg
+
+    std::vector<std::unique_ptr<NodeInfo>> nodeInfos;
 
 
     /////////////////////////////////////////////////////////////
@@ -526,7 +643,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
 
-    std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on pass
+    // std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on passg
 
 
   return PreprocessingPassResult::NO_CONFLICT;
