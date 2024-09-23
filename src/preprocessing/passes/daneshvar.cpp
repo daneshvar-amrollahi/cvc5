@@ -526,6 +526,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
 
+    std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on pass
 
 
   return PreprocessingPassResult::NO_CONFLICT;
