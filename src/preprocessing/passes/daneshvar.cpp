@@ -105,7 +105,7 @@ void dfs(
     
     uint32_t id = subtreeCache.size() + 1;
     subtreeCache[n] = id;
-    std::cout << "Inserting " << n << " with id " << id << std::endl;
+    // std::cout << "Inserting " << n << " with id " << id << std::endl;
     subtreePattern[id] = children;
     symbolList[id] = symbols;
 }
@@ -129,92 +129,59 @@ void getPattern(uint32_t treeId, std::map<uint32_t, std::vector<std::string>>& s
 
 
 
-void getNodeInfo(const Node& n)
+std::unique_ptr<NodeInfo> getNodeInfo(const Node& n, uint32_t id)
 {
     std::map<Node, uint32_t> subtreeCache;
     std::map<std::string, uint32_t> symbolMap;
     std::map<uint32_t, std::vector<std::string>> subtreePattern;
     std::map<uint32_t, std::vector<std::string>> symbolList;
+
     // Fills the above maps and vectors
     dfs(n, subtreeCache, symbolMap, subtreePattern, symbolList);
 
-    // std::cout << "Subtree Cache: " << std::endl;
-    // for (auto& [node, id] : subtreeCache)
-    // {
-    //     std::cout << node << " : " << id << std::endl;
-    // }
-    // std::cout << "Symbol Map: " << std::endl;
-    // for (auto& [symbol, id] : symbolMap)
-    // {
-    //     std::cout << symbol << " : " << id << std::endl;
-    // }
-    // std::cout << "Subtree Pattern: " << std::endl;
-    // for (auto& [id, pattern] : subtreePattern)
-    // {
-    //     std::cout << id << " : ";
-    //     for (auto& symbol : pattern)
-    //     {
-    //         std::cout << symbol << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
-
-
     // Encoding
-    std::string encoding = ""; // concat elements in subtreePattern
-    for (auto& [id, pattern] : subtreePattern)
-    {
-        encoding += std::to_string(id) + ":";
-        for (auto& symbol : pattern)
-        {
+    std::string encoding;
+    for (const auto& [id_key, pattern] : subtreePattern) {
+        encoding += std::to_string(id_key) + ":";
+        for (const auto& symbol : pattern) {
             encoding += symbol + ",";
+        }
+        if (!pattern.empty()) {
+            encoding.pop_back(); // Remove the last comma
         }
         encoding += ";";
     }
-    std::cout << "Encoding: " << encoding << std::endl;
-
 
     uint32_t treeId = subtreeCache[n];
 
     // Pattern
     std::vector<uint32_t> pat;
-    
     getPattern(treeId, subtreePattern, pat);
-    std::cout << "Pattern: ";
-    for (auto& elem : pat)
-    {
-        std::cout << elem << " ";
-    }
-    std::cout << std::endl;
 
     // Symbols
     std::vector<std::string> symbols = symbolList[treeId];
-    std::cout << "Symbols: ";
-    for (auto& symbol : symbols)
-    {
-        std::cout << symbol << " ";
+
+    // Role
+    std::map<std::string, int32_t> role;
+    for (size_t i = 0; i < symbols.size(); i++) {
+        if (role.find(symbols[i]) == role.end()) {
+            role[symbols[i]] = i;
+        }
     }
+
+    // Create NodeInfo using std::make_unique and return the unique_ptr
+    auto ni = std::make_unique<NodeInfo>(
+        n, subtreeCache, symbolMap, subtreePattern, encoding, pat, symbols, role, 0, id);
+
+    return ni;
 }
 
 
 
 
-
-bool sameClass(const NodeInfo& a, const NodeInfo& b)
+bool sameClass(const NodeInfo& a, const NodeInfo& b) // Check if two nodes have the same encoding and pattern
 {
-    if (a.encoding != b.encoding)
-    {
-        return false;
-    }
-    int n = a.pat.size();
-    for (int i = 0; i < n; i++)
-    {
-        if (a.pat[i] != b.pat[i])
-        {
-            return false;
-        }
-    }
-    return true;
+    return a.encoding == b.encoding && a.pat == b.pat;
 }
 
 
@@ -366,56 +333,190 @@ Node rename(const Node& n,
 
 
 
-
-
 PreprocessingPassResult Daneshvar::applyInternal(
     AssertionPipeline* assertionsToPreprocess)
 {
     TimerStat::CodeTimer codeTimer(d_statistics.d_passTime);
 
-    std::vector<NodeInfo> nodeInfos, prv_nodeInfos;
+    std::vector<std::unique_ptr<NodeInfo>> nodeInfos, prv_nodeInfos;
 
 
     /////////////////////////////////////////////////////////////
-    // Step 1: Fix anti-symmetric operators
+    // Step 1: Extract NodeInfo for each assertion
+    uint32_t nextId = 0; 
     for (const Node& assertion : assertionsToPreprocess->ref())
     {
-        std::cout << "Assertion: " << assertion << std::endl;
-        getNodeInfo(assertion);
-        std::cout << std::endl;
+        // std::cout << "Assertion: " << assertion << std::endl;
+        auto ni = getNodeInfo(assertion, nextId++);
+        if (ni) {
+            nodeInfos.push_back(std::move(ni));
+        }
+        // std::cout << std::endl;
     }
-    /////////////////////////////////////////////////////////////
-
-
-    
-
-    std::cout << "Done" << std::endl;
-
-
-    /////////////////////////////////////////////////////////////
-    // Step 7: Variable normalization left ro right top to bottom
-    // prv_nodeInfos = nodeInfos;
-    // nodeInfos.clear();
-
-    // std::map<std::string, Node> freeVar2node;
-    // std::map<std::string, Node> boundVar2node;
-    // NodeManager* nodeManager = NodeManager::currentNM();
-    // for (NodeInfo ni: prv_nodeInfos)
+    // for (const auto&ni: nodeInfos)
     // {
-    //     Node renamed = rename(ni.node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
-    //     // nodeInfos.push_back(getNodeInfo(renamed, -1, -1));
+    //     if (ni)
+    //         ni->print();
+    //     std::cout << std::endl;
     // }
     // /////////////////////////////////////////////////////////////
 
+    
+
+    /////////////////////////////////////////////////////////////
+    // Step 2: Classify assertions into equivalence classes
+    // Use NodeInfo pointers in eqClasses
+    std::map<uint32_t, std::vector<NodeInfo*>> eqClasses;
+
+    for (auto& niPtr : nodeInfos)
+    {
+        NodeInfo* current = niPtr.get();
+        bool found = false;
+        for (auto& [ec, eqClass] : eqClasses)
+        {
+            if (sameClass(*current, *eqClass[0]))
+            {
+                eqClass.push_back(current);
+                current->equivClass = ec;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            eqClasses[current->id] = { current };
+            current->equivClass = current->id;
+        }
+    }
+
+    // for (const auto& [ec, eqClass] : eqClasses)
+    // {
+    //     std::cout << "Equivalence class " << ec << std::endl;
+    //     for (const auto& ni : eqClass)
+    //     {
+    //         std::cout << "Node: " << ni->node << std::endl;
+    //     }
+    //     std::cout << std::endl;
+    // }
+
+    /////////////////////////////////////////////////////////////
+
+
+
+
+    /////////////////////////////////////////////////////////////
+    // Step 3: Sort nodes based on equivalence classes and super-patterns with customized comparison function
+
+    std::map<std::string, std::vector<int32_t>> superpattern; // Cache of superpatterns    
+
+    std::sort(nodeInfos.begin(), nodeInfos.end(),
+        [&eqClasses, &superpattern](const std::unique_ptr<NodeInfo>& a, const std::unique_ptr<NodeInfo>& b) {
+            if (a->equivClass != b->equivClass) {
+                return a->equivClass < b->equivClass;
+            }
+            // std::cout << "Comparing " << a->node << " and " << b->node << std::endl;
+            // std::cout << "Same class" << std::endl;
+
+            size_t minSize = std::min(a->symbols.size(), b->symbols.size());
+            for (size_t i = 0; i < minSize; i++) {
+                if (a->symbols[i] == b->symbols[i]) {
+                    continue;
+                }
+
+                // Compute or retrieve superpatterns
+                auto getOrComputeSuperpattern = [&](const std::string& symbol) -> std::vector<int32_t> {
+                    auto it = superpattern.find(symbol);
+                    if (it != superpattern.end()) {
+                        return it->second;
+                    }
+
+                    std::vector<int32_t> spat;
+                    for (const auto& [ec, eqClass] : eqClasses)
+                    {
+                        std::vector<uint32_t> roles;
+                        for (const NodeInfo* ni : eqClass)
+                        {
+                            auto roleIt = ni->role.find(symbol);
+                            if (roleIt != ni->role.end())
+                            {
+                                roles.push_back(roleIt->second);
+                            }
+                            else {
+                                roles.push_back(static_cast<int32_t>(-1));
+                            }
+                        }
+                        std::sort(roles.begin(), roles.end());
+                        spat.insert(spat.end(), roles.begin(), roles.end());
+                    }
+
+                    superpattern[symbol] = spat;
+                    return spat;
+                };
+
+                std::vector<int32_t> spat_a = getOrComputeSuperpattern(a->symbols[i]);
+                std::vector<int32_t> spat_b = getOrComputeSuperpattern(b->symbols[i]);
+
+                // std::cout << "Comparing symbols " << a->symbols[i] << " and " << b->symbols[i] << std::endl;
+                // std::cout << "Superpattern A: ";
+                // for (const auto& elem : spat_a)
+                // {
+                //     std::cout << elem << " ";
+                // }
+                // std::cout << std::endl;
+                // std::cout << "Superpattern B: ";
+                // for (const auto& elem : spat_b)
+                // {
+                //     std::cout << elem << " ";
+                // }
+                // std::cout << std::endl << std::endl;
+
+                // Compare the superpatterns
+                size_t minSpatSize = std::min(spat_a.size(), spat_b.size());
+                for (size_t j = 0; j < minSpatSize; j++) {
+                    if (spat_a[j] != spat_b[j]) {
+                        return spat_a[j] < spat_b[j];
+                    }
+                }
+
+            }
+
+
+
+            return false;
+        });
 
 
     
-   
 
+    // for (const auto&ni: nodeInfos)
+    // {
+    //     if (ni)
+    //         ni->print();
+    //     std::cout << std::endl;
+    // }
+    /////////////////////////////////////////////////////////////
+
+
+
+
+    //////////////////////////////////////////////////////////////////////
+    // Step 4: Normalize the nodes based on the sorted order
+    std::map<std::string, Node> freeVar2node;
+    std::map<std::string, Node> boundVar2node;
+    NodeManager* nodeManager = NodeManager::currentNM();
+    std::vector<Node> normalizedNodes;
     for (size_t i = 0; i < nodeInfos.size(); i++)
     {
-        // assertionsToPreprocess->replace(i, nodeInfos[i].node);
-        // std::cout << nodeInfos[i].node << std::endl;
+        Node renamed = rename(nodeInfos[i]->node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
+        normalizedNodes.push_back(renamed);
+    }
+    //////////////////////////////////////////////////////////////////////
+
+    
+    for (uint32_t i = 0; i < nodeInfos.size(); i++)
+    {
+        // std::cout << "Normalized Node " << i << ": " << normalizedNodes[i] << std::endl;
+        assertionsToPreprocess->replace(i, normalizedNodes[i]);
     }
 
 

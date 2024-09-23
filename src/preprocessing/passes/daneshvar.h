@@ -36,8 +36,9 @@ struct NodeInfo
   std::string encoding;                 // Concat elements in subtreePattern           
   std::vector<uint32_t> pat;            // Can be obtained from subtreePattern
   std::vector<std::string> symbols;     // List of symbols in this node left to right 
-  std::map<std::string, uint32_t> role; // The role (index of first occurence) of a symbol in the pattern
+  std::map<std::string, int32_t> role; // The role (index of first occurence) of a symbol in the pattern
   uint32_t equivClass;
+  uint32_t id;
   NodeInfo() {}
 
   NodeInfo(Node n,
@@ -47,8 +48,9 @@ struct NodeInfo
           const std::string& e,
           const std::vector<uint32_t>& p,
           const std::vector<std::string>& s,
-          const std::map<std::string, uint32_t>& r,
-          uint32_t ec)
+          const std::map<std::string, int32_t>& r,
+          uint32_t ec,
+          uint32_t identifier)
       : node(n),
         subtreeCache(sc),
         symbolMap(sm),
@@ -57,9 +59,30 @@ struct NodeInfo
         pat(p),
         symbols(s),
         role(r),
-        equivClass(ec)
+        equivClass(ec),
+        id(identifier)
   {
   }
+
+  void print() const {
+        std::cout << "Node: " << node << std::endl;
+        std::cout << "Encoding: " << encoding << std::endl;
+        std::cout << "Pattern: ";
+        for (const auto& elem : pat) {
+            std::cout << elem << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "Symbols: ";
+        for (const auto& symbol : symbols) {
+            std::cout << symbol << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "Role: ";
+        for (const auto& [symbol, idx] : role) {
+            std::cout << symbol << " : " << idx << " , ";
+        }
+        std::cout << std::endl;
+    }
 
 };
 
