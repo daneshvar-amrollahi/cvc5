@@ -111,8 +111,7 @@ void dfs_iterative(
     const Node& root,
     std::map<Node, uint32_t>& subtreeCache,
     std::map<std::string, uint32_t>& symbolMap,
-    std::map<uint32_t, std::vector<std::string>>& subtreePattern,
-    std::map<uint32_t, std::vector<std::string>>& symbolList)
+    std::map<uint32_t, std::vector<std::string>>& subtreePattern)
 {
     // Stack to hold nodes and a flag indicating if the node's children have been processed
     std::stack<std::pair<Node, bool>> stack;
@@ -205,15 +204,12 @@ void dfs_iterative(
                 else
                 {
                     children.push_back("S" + std::to_string(subtreeCache[child]));
-                    const auto& childSymbols = symbolList[subtreeCache[child]];
-                    symbols.insert(symbols.end(), childSymbols.begin(), childSymbols.end());
                 }
             }
 
             uint32_t id = subtreeCache.size() + 1;
             subtreeCache[n] = id;
             subtreePattern[id] = std::move(children);
-            symbolList[id] = std::move(symbols);
         }
     }
 
@@ -240,95 +236,6 @@ void getPattern(uint32_t treeId, std::map<uint32_t, std::vector<std::string>>& s
     }
 }
 
-void getPatternIterative(
-    uint32_t rootTreeId,
-    const std::map<uint32_t, std::vector<std::string>>& subtreePattern,
-    std::vector<uint32_t>& pat)
-{
-    // Stack for traversal
-    struct StackEntry {
-        uint32_t treeId;
-        size_t index; // Index in the node's pattern
-        bool isReturning; // Indicates whether we are returning from processing children
-    };
-
-    std::stack<StackEntry> stack;
-    std::unordered_set<uint32_t> visited; // To keep track of processed nodes
-
-    // Start by pushing the root node onto the stack
-    stack.push({rootTreeId, 0, false});
-
-    while (!stack.empty())
-    {
-        StackEntry& entry = stack.top();
-
-        uint32_t treeId = entry.treeId;
-
-        // Check if we have already processed this node
-        if (visited.find(treeId) != visited.end())
-        {
-            stack.pop(); // Node is already processed
-            continue;
-        }
-
-        if (entry.isReturning)
-        {
-            // We have processed all children; now process the node itself
-            const std::vector<std::string>& pattern = subtreePattern.at(treeId);
-
-            for (; entry.index < pattern.size(); ++entry.index)
-            {
-                const std::string& elem = pattern[entry.index];
-
-                if (elem[0] == 'S')
-                {
-                    // Subtree reference; its symbols have been processed
-                    // No need to do anything here as symbols from the subtree
-                    // have already been added to 'pat' during their processing
-                }
-                else
-                {
-                    // Symbol
-                    uint32_t symbol = std::stoi(elem);
-                    pat.push_back(symbol);
-                }
-            }
-
-            // Finished processing this node
-            visited.insert(treeId);
-            stack.pop();
-        }
-        else
-        {
-            // First time we are processing this node
-            entry.isReturning = true; // Mark that we'll process this node after its children
-
-            const std::vector<std::string>& pattern = subtreePattern.at(treeId);
-
-            // Push children onto the stack in reverse order to maintain left-to-right processing
-            for (auto it = pattern.rbegin(); it != pattern.rend(); ++it)
-            {
-                const std::string& elem = *it;
-
-                if (elem[0] == 'S')
-                {
-                    uint32_t subTreeId = std::stoi(elem.substr(1));
-
-                    // Only process the subtree if it hasn't been processed yet
-                    if (visited.find(subTreeId) == visited.end())
-                    {
-                        stack.push({subTreeId, 0, false});
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-
-
-
 
 
 void collectSymbols(
@@ -352,56 +259,6 @@ void collectSymbols(
         collectSymbols(n[i], symbols);
     }
 }
-void collectSymbolsIterative(
-    const Node& root,
-    std::vector<std::string>& symbols)
-{
-    std::stack<Node> stack;
-    std::unordered_set<size_t> visited; // Cache to store processed node IDs
-
-    stack.push(root);
-
-    while (!stack.empty())
-    {
-        Node n = stack.top();
-        stack.pop();
-
-        // Get the unique ID of the node
-        size_t nodeId = n.getId();
-
-        // Check if the node has already been processed
-        if (visited.find(nodeId) != visited.end())
-        {
-            continue;
-        }
-
-        // Mark the node as processed
-        visited.insert(nodeId);
-
-        if (n.isConst())
-        {
-            // Skip constants
-            continue;
-        }
-        else if (n.isVar())
-        {
-            // Collect the symbol from the variable node
-            symbols.push_back(n.toString());
-        }
-        else
-        {
-            // Non-constant, non-variable node
-            // Push its children onto the stack in reverse order
-            size_t numChildren = n.getNumChildren();
-            for (size_t i = numChildren; i-- > 0;)
-            {
-                Node child = n[i];
-                stack.push(child);
-            }
-        }
-    }
-}
-
 
 
 
@@ -414,7 +271,7 @@ std::unique_ptr<NodeInfo> getNodeInfo(const Node& n, uint32_t id)
 
     // Fills the above maps and vectors
     // std::cout << "DFSing " << n << std::endl;
-    dfs(n, subtreeCache, symbolMap, subtreePattern);
+    dfs_iterative(n, subtreeCache, symbolMap, subtreePattern);
     // std::cout << "DFS done" << std::endl;
 
     // Encoding
