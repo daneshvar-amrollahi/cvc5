@@ -808,12 +808,12 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(std::move(ni));
         // std::cout << std::endl;
     }
-    for (const auto&ni: nodeInfos)
-    {
-        if (ni)
-            ni->print();
-        std::cout << std::endl;
-    }
+    // for (const auto&ni: nodeInfos)
+    // {
+    //     if (ni)
+    //         ni->print();
+    //     std::cout << std::endl;
+    // }
     // /////////////////////////////////////////////////////////////
 
     
@@ -844,15 +844,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
         }
     }
 
-    for (const auto& [ec, eqClass] : eqClasses)
-    {
-        std::cout << "Equivalence class " << ec << std::endl;
-        for (const auto& ni : eqClass)
-        {
-            std::cout << "Node: " << ni->node << std::endl;
-        }
-        std::cout << std::endl;
-    }
+    // for (const auto& [ec, eqClass] : eqClasses)
+    // {
+    //     std::cout << "Equivalence class " << ec << std::endl;
+    //     for (const auto& ni : eqClass)
+    //     {
+    //         std::cout << "Node: " << ni->node << std::endl;
+    //     }
+    //     std::cout << std::endl;
+    // }
 
     /////////////////////////////////////////////////////////////
 
