@@ -330,26 +330,18 @@ void generateEncoding(
 
 
 
-
-
-
-
-
 void generatePattern(
     uint32_t treeId,
     const std::map<uint32_t, std::vector<std::string>>& subtreePattern,
     std::vector<uint32_t>& pat)
 {
-    // Stack to manage nodes to process
     std::stack<uint32_t> stack;
 
-    // Cache to store patterns of subtrees to avoid recomputation
+    std::unordered_map<uint32_t, bool> visited;
+
+    // Cache to store patterns of subtrees
     std::unordered_map<uint32_t, std::vector<uint32_t>> patternCache;
 
-    // Set to keep track of nodes currently being processed (to detect cycles)
-    std::unordered_set<uint32_t> inProcess;
-
-    // Initialize the stack with the root treeId
     if (treeId != 0)
     {
         stack.push(treeId);
@@ -366,42 +358,77 @@ void generatePattern(
             continue;
         }
 
-        // If the pattern is already cached, we can skip processing
-        if (patternCache.find(currentId) != patternCache.end())
+        auto it = visited.find(currentId);
+        if (it == visited.end())
         {
-            stack.pop();
-            continue;
-        }
+            // First time seeing currentId
+            visited[currentId] = false; // Mark as not yet processed
 
-        // If the node is already in process, it means all its children have been handled
-        if (inProcess.find(currentId) != inProcess.end())
-        {
-            inProcess.erase(currentId);
-            stack.pop();
-
-            // Build the pattern for the current node
-            auto it = subtreePattern.find(currentId);
-            if (it == subtreePattern.end())
+            // Retrieve the pattern strings for the current node
+            auto patternIt = subtreePattern.find(currentId);
+            if (patternIt == subtreePattern.end())
             {
                 // Handle the error or skip
+                stack.pop();
                 continue;
             }
-            const auto& patternStrs = it->second;
-            std::vector<uint32_t> currentPattern;
+            const auto& patternStrs = patternIt->second;
 
+            // Push child subtrees onto the stack
             for (const auto& elem : patternStrs)
             {
-                if (elem[0] == 'S')
+                if (!elem.empty() && elem[0] == 'S')
                 {
-                    uint32_t subtreeId = std::stoul(elem.substr(1));
-                    if (subtreeId == 0)
+                    uint32_t childId = std::stoul(elem.substr(1));
+                    if (childId == 0)
                     {
                         // Skip nodes with ID 0
                         continue;
                     }
+                    // If child not yet visited, push onto stack
+                    if (visited.find(childId) == visited.end())
+                    {
+                        stack.push(childId);
+                    }
+                }
+            }
+
+            continue; // Go back to the start of the loop
+        }
+        else if (!it->second)
+        {
+            auto patternIt = subtreePattern.find(currentId);
+            if (patternIt == subtreePattern.end())
+            {
+                // Handle the error or skip
+                stack.pop();
+                continue;
+            }
+            const auto& patternStrs = patternIt->second;
+
+            std::vector<uint32_t> currentPattern;
+
+            for (const auto& elem : patternStrs)
+            {
+                if (!elem.empty() && elem[0] == 'S')
+                {
+                    uint32_t subtreeId = std::stoul(elem.substr(1));
+                    if (subtreeId == 0)
+                    {
+                        continue;
+                    }
                     // Append the pattern of the subtree
-                    const auto& subtreePat = patternCache[subtreeId];
-                    currentPattern.insert(currentPattern.end(), subtreePat.begin(), subtreePat.end());
+                    const auto& subtreePatIt = patternCache.find(subtreeId);
+                    if (subtreePatIt != patternCache.end())
+                    {
+                        const auto& subtreePat = subtreePatIt->second;
+                        currentPattern.insert(currentPattern.end(), subtreePat.begin(), subtreePat.end());
+                    }
+                    else
+                    {
+                        // This should not happen if the DAG is correctly formed
+                        std::cerr << "Error: Pattern for subtree ID " << subtreeId << " not found." << std::endl;
+                    }
                 }
                 else
                 {
@@ -412,51 +439,17 @@ void generatePattern(
 
             // Cache the pattern for the current node
             patternCache[currentId] = std::move(currentPattern);
+
+            // Mark as processed
+            it->second = true;
+
+            // Pop the node
+            stack.pop();
         }
         else
         {
-            // Mark the node as in process
-            inProcess.insert(currentId);
-
-            // Retrieve the pattern strings for the current node
-            auto it = subtreePattern.find(currentId);
-            if (it == subtreePattern.end())
-            {
-                // Handle the error or skip
-                stack.pop();
-                inProcess.erase(currentId);
-                continue;
-            }
-            const auto& patternStrs = it->second;
-
-            // Flag to check if we need to process child subtrees
-            bool needsProcessing = false;
-
-            // Iterate over the elements to check if any subtrees need processing
-            for (const auto& elem : patternStrs)
-            {
-                if (elem[0] == 'S')
-                {
-                    uint32_t subtreeId = std::stoul(elem.substr(1));
-                    if (subtreeId == 0)
-                    {
-                        // Skip nodes with ID 0
-                        continue;
-                    }
-                    if (patternCache.find(subtreeId) == patternCache.end())
-                    {
-                        // Push the child subtree onto the stack for processing
-                        stack.push(subtreeId);
-                        needsProcessing = true;
-                    }
-                }
-            }
-
-            // If no child subtrees need processing, we'll process the current node in the next iteration
-            if (!needsProcessing)
-            {
-                continue;
-            }
+            // Node has already been processed, pop it
+            stack.pop();
         }
     }
 
@@ -471,6 +464,16 @@ void generatePattern(
         pat.clear();
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 void collectSymbols(
