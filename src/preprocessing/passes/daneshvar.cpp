@@ -235,55 +235,60 @@ void collectSymbols(
 */
 
 
-
-
-
-
-
-
-
-
 void generateEncoding(
     uint32_t rootId,
     const std::map<uint32_t, std::vector<std::string>>& subtreePattern,
-    std::string &encoding)
+    std::string& encoding)
 {
-    // Cache to store already computed encodings
-    std::unordered_map<uint32_t, std::string> encodingCache;
-
-    // Stack for iterative traversal
     std::stack<uint32_t> stack;
-    // Set to keep track of nodes in the current path to prevent cycles
-    std::unordered_set<uint32_t> inProcess;
-
-    // Vector to collect encodings in the correct order
-    std::vector<std::string> encodingList;
-
-    // Start traversal from rootId
     stack.push(rootId);
+
+    std::unordered_map<uint32_t, bool> visited; // Map to keep track of visited nodes
+
+    std::vector<std::string> encodingList; // Vector to collect encodings in the correct order
 
     while (!stack.empty())
     {
         uint32_t currentId = stack.top();
 
-        // If the encoding is already cached, we can skip processing
-        if (encodingCache.find(currentId) != encodingCache.end())
+        auto [it, inserted] = visited.emplace(currentId, false);
+        if (inserted)
         {
-            stack.pop();
-            continue;
-        }
+            visited[currentId] = false; // Mark as not yet processed
 
-        // Check if the node is already in process (to detect cycles)
-        if (inProcess.find(currentId) != inProcess.end())
-        {
-            // We have already processed this node's children
-            stack.pop();
-
-            // Build the encoding for the current node
-            auto it = subtreePattern.find(currentId);
-            if (it != subtreePattern.end())
+            auto patternIt = subtreePattern.find(currentId);
+            if (patternIt != subtreePattern.end())
             {
-                const auto& pattern = it->second;
+                const auto& pattern = patternIt->second;
+                for (const auto& symbol : pattern)
+                {
+                    if (!symbol.empty() && symbol[0] == 'S')
+                    {
+                        uint32_t childId = std::stoi(symbol.substr(1));
+                        // If child not yet visited, push onto stack
+                        if (visited.find(childId) == visited.end())
+                        {
+                            stack.push(childId);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (currentId != 0)
+                    std::cerr << "Error: ID " << currentId << " not found in subtreePattern." << std::endl;
+                stack.pop();
+                continue;
+            }
+        }
+        else if (!it->second)
+        {
+            // Second time seeing currentId, process it
+            // Build the encoding for the current node
+            auto patternIt = subtreePattern.find(currentId);
+            if (patternIt != subtreePattern.end())
+            {
+                const auto& pattern = patternIt->second;
                 std::string nodeEncoding = std::to_string(currentId) + ":";
                 for (const auto& symbol : pattern)
                 {
@@ -295,67 +300,38 @@ void generateEncoding(
                 }
                 nodeEncoding += ";";
 
-                // Cache the encoding
-                encodingCache[currentId] = nodeEncoding;
                 // Collect the encoding
                 encodingList.push_back(nodeEncoding);
             }
             else
             {
                 // Handle the error: currentId not found in subtreePattern
-                std::cerr << "Error: ID " << currentId << " not found in subtreePattern." << std::endl;
+                if (currentId != 0)
+                    std::cerr << "Error: ID " << currentId << " not found in subtreePattern." << std::endl;
             }
 
-            inProcess.erase(currentId);
-            continue;
-        }
-
-        // Mark the node as in process
-        inProcess.insert(currentId);
-
-        // Push child subtrees onto the stack
-        auto it = subtreePattern.find(currentId);
-        if (it != subtreePattern.end())
-        {
-            const auto& pattern = it->second;
-            bool hasChildren = false;
-            for (const auto& symbol : pattern)
-            {
-                if (!symbol.empty() && symbol[0] == 'S')
-                {
-                    uint32_t childId = std::stoi(symbol.substr(1));
-                    if (encodingCache.find(childId) == encodingCache.end())
-                    {
-                        stack.push(childId);
-                        hasChildren = true;
-                    }
-                }
-            }
-            // If there are no children or all children are already processed,
-            // we can process the current node on the next iteration
-            if (!hasChildren)
-            {
-                continue;
-            }
+            it->second = true; // Mark as processed
+            stack.pop();
         }
         else
         {
-            // Handle the error: currentId not found in subtreePattern
-            if (currentId != 0)
-                std::cerr << "Error: ID " << currentId << " not found in subtreePattern." << std::endl;
+            // Node has already been processed, pop it
             stack.pop();
-            inProcess.erase(currentId);
         }
     }
 
-    // Build the final encoding by concatenating the collected encodings in reverse order
-    // (since we added them in post-order)
+
     for (auto it = encodingList.rbegin(); it != encodingList.rend(); ++it)
     {
         encoding += *it;
     }
-
 }
+
+
+
+
+
+
 
 
 
@@ -567,19 +543,24 @@ std::unique_ptr<NodeInfo> Daneshvar::getNodeInfo(const Node& node, uint32_t id)
 
     dfs_iterative(node, subtreePattern, subtreeIdMap, visited, parMap, symbolMap);
 
-    
+    // std::cout << "DFS done" << std::endl;
 
     uint32_t rootId = subtreeIdMap[node];
 
     std::string encoding;
     generateEncoding(rootId, subtreePattern, encoding);
+    // std::cout << "Got encoding" << std::endl;
     std::vector<uint32_t> pattern;    
     generatePattern(rootId, subtreePattern, pattern);
+    // std::cout << "Got pattern" << std::endl;
     std::vector<std::string> symbols;    
     collectSymbols(pattern, symbolMap, symbols);
+    // std::cout << "Got symbols" << std::endl;
     std::map<std::string, int32_t> role;
     generateRole(symbols, role);
+    // std::cout << "Got role" << std::endl;
 
+    normalizePattern(pattern);
 
     auto ni = std::make_unique<NodeInfo>(
         node, subtreeIdMap, symbolMap, subtreePattern, encoding, pattern, symbols, role, 0, id);
@@ -824,12 +805,12 @@ PreprocessingPassResult Daneshvar::applyInternal(
         nodeInfos.push_back(std::move(ni));
         // std::cout << std::endl;
     }
-    // for (const auto&ni: nodeInfos)
-    // {
-    //     if (ni)
-    //         ni->print();
-    //     std::cout << std::endl;
-    // }
+    for (const auto&ni: nodeInfos)
+    {
+        if (ni)
+            ni->print();
+        std::cout << std::endl;
+    }
     // /////////////////////////////////////////////////////////////
 
     
@@ -860,15 +841,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
         }
     }
 
-    // for (const auto& [ec, eqClass] : eqClasses)
-    // {
-    //     std::cout << "Equivalence class " << ec << std::endl;
-    //     for (const auto& ni : eqClass)
-    //     {
-    //         std::cout << "Node: " << ni->node << std::endl;
-    //     }
-    //     std::cout << std::endl;
-    // }
+    for (const auto& [ec, eqClass] : eqClasses)
+    {
+        std::cout << "Equivalence class " << ec << std::endl;
+        for (const auto& ni : eqClass)
+        {
+            std::cout << "Node: " << ni->node << std::endl;
+        }
+        std::cout << std::endl;
+    }
 
     /////////////////////////////////////////////////////////////
 
