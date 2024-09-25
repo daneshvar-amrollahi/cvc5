@@ -29,61 +29,54 @@ namespace passes {
 struct NodeInfo
 {
   Node node;
-  std::map<Node, uint32_t> subtreeCache;
-  std::map<std::string, uint32_t> symbolMap; // {A: 1, B: 2, C: 3}
+  std::unordered_map<Node, uint32_t> subtreeIdMap;
+  std::unordered_map<std::string, uint32_t> symbolMap; // {A: 1, B: 2, C: 3}
   std::map<uint32_t, std::vector<std::string>> subtreePattern; // {1: {1}, 2: {1, 2}, 3: {S1, S2}}
 
   std::string encoding;                 // Concat elements in subtreePattern           
   std::vector<uint32_t> pat;            // Can be obtained from subtreePattern
   std::vector<std::string> symbols;     // List of symbols in this node left to right 
-  std::map<std::string, int32_t> role; // The role (index of first occurence) of a symbol in the pattern
+  std::map<std::string, int32_t> role;  // The role (index of first occurrence) of a symbol in the pattern
   uint32_t equivClass;
   uint32_t id;
+
   NodeInfo() {}
 
-  NodeInfo(Node n,
-          const std::map<Node, uint32_t>& sc,
-          const std::map<std::string, uint32_t>& sm,
-          const std::map<uint32_t, std::vector<std::string>>& sp,
-          const std::string& e,
-          const std::vector<uint32_t>& p,
-          const std::vector<std::string>& s,
-          const std::map<std::string, int32_t>& r,
-          uint32_t ec,
-          uint32_t identifier)
-      : node(n),
-        subtreeCache(sc),
-        symbolMap(sm),
-        subtreePattern(sp),
-        encoding(e),
-        pat(p),
-        symbols(s),
-        role(r),
-        equivClass(ec),
-        id(identifier)
-  {
-  }
+  NodeInfo(
+    const Node& n, 
+    const std::unordered_map<Node, uint32_t>& sidMap, 
+    const std::unordered_map<std::string, uint32_t>& symMap, 
+    const std::map<uint32_t, std::vector<std::string>>& subPattern, 
+    const std::string& enc, 
+    const std::vector<uint32_t>& p, 
+    const std::vector<std::string>& syms, 
+    const std::map<std::string, int32_t>& r, 
+    uint32_t eqClass, 
+    uint32_t i
+  ) : node(n), subtreeIdMap(sidMap), symbolMap(symMap), subtreePattern(subPattern), encoding(enc), pat(p), symbols(syms), role(r), equivClass(eqClass), id(i) {}
 
   void print() const {
-        std::cout << "Node: " << node << std::endl;
-        std::cout << "Encoding: " << encoding << std::endl;
-        std::cout << "Pattern: ";
-        for (const auto& elem : pat) {
-            std::cout << elem << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "Symbols: ";
-        for (const auto& symbol : symbols) {
-            std::cout << symbol << " ";
-        }
-        std::cout << std::endl;
-        std::cout << "Role: ";
-        for (const auto& [symbol, idx] : role) {
-            std::cout << symbol << " : " << idx << " , ";
-        }
-        std::cout << std::endl;
+    std::cout << "Node : " << node << std::endl;
+    std::cout << "Encoding: " << encoding << std::endl;
+    std::cout << "Pattern: ";
+    for (const auto& elem : pat)
+    {
+        std::cout << elem << " ";
     }
-
+    std::cout << std::endl;
+    std::cout << "Symbols: ";
+    for (const auto& symbol : symbols)
+    {
+        std::cout << symbol << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "Role: ";
+    for (const auto& [symbol, idx] : role)
+    {
+        std::cout << symbol << " : " << idx << " , ";
+    }
+    std::cout << std::endl;
+  }
 };
 
 
@@ -109,6 +102,16 @@ private:
     Statistics(StatisticsRegistry& reg);
   };
 
+  void computeSubtreePattern(const Node& n, std::vector<uint32_t>& rootId);
+  void dfs_iterative(
+    const Node& root, 
+    std::map<uint32_t, std::vector<std::string>>& subtreePattern, 
+    std::unordered_map<Node, uint32_t>& subtreeIdMap, 
+    std::unordered_map<Node, bool>& visited, 
+    std::unordered_map<Node, uint32_t>& parMap, 
+    std::unordered_map<std::string, uint32_t>& symbolMap
+  ); 
+  std::unique_ptr<NodeInfo> getNodeInfo(const Node& node, uint32_t id);
   Statistics d_statistics;
 };
 
