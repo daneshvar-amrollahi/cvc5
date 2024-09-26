@@ -594,7 +594,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     
     for (uint32_t i = 0; i < nodeInfos.size(); i++)
     {
-        std::cout << "Normalized Node " << i << ": " << normalizedNodes[i] << std::endl;
+        // std::cout << "Normalized Node " << i << ": " << normalizedNodes[i] << std::endl;
         assertionsToPreprocess->replace(i, normalizedNodes[i]);
     }
     
