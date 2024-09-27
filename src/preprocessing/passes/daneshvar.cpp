@@ -73,7 +73,7 @@ void generateEncoding(
             {
                 // Operator node
                 // Push its unvisited children onto the stack
-                for (size_t i = 0; i < n.getNumChildren(); i++)
+                for (size_t i = 0; i < n.getNumChildren(); ++i)
                 {
                     Node child = n[i];
                     if (visited.find(child) == visited.end())
@@ -119,7 +119,7 @@ void generateEncoding(
                 nodeEncoding += opKind + ",";
 
                 // For each child, include appropriate encoding
-                for (size_t i = 0; i < n.getNumChildren(); i++)
+                for (size_t i = 0; i < n.getNumChildren(); ++i)
                 {
                     Node child = n[i];
                     if (child.isConst())
@@ -315,7 +315,7 @@ Node rename(
             }
 
             // Add normalized children
-            for (size_t i = 0; i < current.getNumChildren(); i++)
+            for (size_t i = 0; i < current.getNumChildren(); ++i)
             {
                 auto childIt = normalized.find(current[i]);
                 Assert(childIt != normalized.end());
@@ -355,7 +355,7 @@ Node rename(
 
                 // Normalize bound variables and update scope
                 std::vector<Node> normalizedBoundVars;
-                for (size_t i = 0; i < bound_vars.getNumChildren(); i++)
+                for (size_t i = 0; i < bound_vars.getNumChildren(); ++i)
                 {
                     Node bv = bound_vars[i];
                     int id = globalVarCounter++;
@@ -552,7 +552,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
                 // Compare patterns
                 size_t minPatSize = std::min(pat_a.size(), pat_b.size());
-                for (size_t j = 0; j < minPatSize; j++) {
+                for (size_t j = 0; j < minPatSize; ++j) {
                     if (pat_a[j] != pat_b[j]) {
                         return pat_a[j] < pat_b[j];
                     }
@@ -574,7 +574,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // // }
     /////////////////////////////////////////////////////////////
 
-
+    // std::cout << "renaming" << std::endl;
 
     //////////////////////////////////////////////////////////////////////
     // Step 4: Normalize the nodes based on the sorted order
@@ -582,7 +582,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::unordered_map<std::string, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
     std::vector<Node> normalizedNodes;
-    for (size_t i = 0; i < nodeInfos.size(); i++)
+    for (size_t i = 0; i < nodeInfos.size(); ++i)
     {
         Node renamed = rename(nodeInfos[i]->node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
         normalizedNodes.push_back(renamed);
@@ -592,7 +592,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // std::cout << "Renamed nodes" << std::endl;
 
     
-    for (uint32_t i = 0; i < nodeInfos.size(); i++)
+    for (uint32_t i = 0; i < nodeInfos.size(); ++i)
     {
         // std::cout << "Normalized Node " << i << ": " << normalizedNodes[i] << std::endl;
         assertionsToPreprocess->replace(i, normalizedNodes[i]);
