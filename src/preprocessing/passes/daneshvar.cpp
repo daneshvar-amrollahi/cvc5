@@ -269,7 +269,7 @@ Node rename(
                     else
                     {
                         int id = globalVarCounter++;
-                        std::string new_var_name = "u" + std::string(5 - numDigits(id), '0') + std::to_string(id);
+                        std::string new_var_name = "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                         Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
                         currentScope[varName] = ret;
                         normalized[current] = ret;
@@ -287,7 +287,7 @@ Node rename(
                     {
                         std::vector<Node> cnodes;
                         int id = freeVar2node.size();
-                        std::string new_var_name = "v" + std::string(5 - numDigits(id), '0') + std::to_string(id);
+                        std::string new_var_name = "v" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                         cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
                         Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
                         cnodes.push_back(gt);
@@ -359,7 +359,7 @@ Node rename(
                 {
                     Node bv = bound_vars[i];
                     int id = globalVarCounter++;
-                    std::string new_var_name = "u" + std::string(5 - numDigits(id), '0') + std::to_string(id);
+                    std::string new_var_name = "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                     Node newBv = nodeManager->mkBoundVar(new_var_name, bv.getType());
                     newScope[bv.toString()] = newBv;
                     normalized[bv] = newBv;
