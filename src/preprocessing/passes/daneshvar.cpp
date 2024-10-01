@@ -219,7 +219,7 @@ int numDigits(int n)
 
 Node rename(
     const Node& n,
-    std::unordered_map<std::string, Node>& freeVar2node,
+    std::unordered_map<Node, Node>& freeVar2node,
     std::unordered_map<Node, Node>& boundVar2node,
     NodeManager* nodeManager,
     PreprocessingPassContext* d_preprocContext)
@@ -233,7 +233,7 @@ Node rename(
     // Map to keep track of visited nodes
     std::unordered_map<Node, bool> visited;
 
-    // Initialize a global variable counter for bound variables
+    // Initialize a global variable counter for variable renaming
     static int globalVarCounter = 0;
 
     // Push the root node onto the stack
@@ -273,9 +273,8 @@ Node rename(
                     }
                     else
                     {
-                        // Handle free variable
-                        auto varName = current.toString();
-                        auto it_fv = freeVar2node.find(varName);
+                        // Handle free variable using nodes as keys
+                        auto it_fv = freeVar2node.find(current);
                         if (it_fv != freeVar2node.end())
                         {
                             normalized[current] = it_fv->second;
@@ -283,7 +282,7 @@ Node rename(
                         else
                         {
                             std::vector<Node> cnodes;
-                            int id = freeVar2node.size();
+                            int id = globalVarCounter++;
                             std::string new_var_name =
                                 "v" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                             cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
@@ -291,7 +290,7 @@ Node rename(
                             cnodes.push_back(gt);
                             Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(
                                 SkolemFunId::INPUT_VARIABLE, cnodes);
-                            freeVar2node[varName] = ret;
+                            freeVar2node[current] = ret;
                             normalized[current] = ret;
                             d_preprocContext->addSubstitution(current, ret);
                         }
@@ -414,6 +413,7 @@ Node rename(
 
     return normalized[n];
 }
+
 
 
 
@@ -595,7 +595,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     //////////////////////////////////////////////////////////////////////
     // Step 4: Normalize the nodes based on the sorted order
-    std::unordered_map<std::string, Node> freeVar2node;
+    std::unordered_map<Node, Node> freeVar2node;
     // std::unordered_map<std::string, Node> boundVar2node;
     std::unordered_map<Node, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
