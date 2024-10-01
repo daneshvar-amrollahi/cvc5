@@ -401,7 +401,7 @@ Node rename(
 
 
 
-
+/*
 Node rename(
     const Node& n,
     std::unordered_map<std::string, Node>& freeVar2node,
@@ -568,6 +568,216 @@ Node rename(
             {
                 stack.push({current[i], false});
             }
+        }
+    }
+
+    return normalized[n];
+}
+*/
+
+Node rename(
+    const Node& n,
+    std::unordered_map<std::string, Node>& freeVar2node,
+    std::unordered_map<Node, Node>& boundVar2node,
+    NodeManager* nodeManager,
+    PreprocessingPassContext* d_preprocContext)
+{
+    // Map to cache normalized nodes
+    std::unordered_map<Node, Node> normalized;
+
+    // Stack for iterative traversal
+    std::stack<Node> stack;
+
+    // Map to keep track of visited nodes
+    std::unordered_map<Node, bool> visited;
+
+    // Initialize a global variable counter for bound variables
+    static int globalVarCounter = 0;
+
+    // Push the root node onto the stack
+    stack.push(n);
+
+    while (!stack.empty())
+    {
+        Node current = stack.top();
+
+        auto [it, inserted] = visited.emplace(current, false);
+        if (inserted)
+        {
+            // First time seeing this node
+
+            if (current.isConst() || current.isVar())
+            {
+                // For constants and variables, process immediately
+                if (current.isVar())
+                {
+                    if (current.getKind() == cvc5::internal::Kind::BOUND_VARIABLE)
+                    {
+                        // Handle bound variable
+                        auto it_bv = boundVar2node.find(current);
+                        if (it_bv != boundVar2node.end())
+                        {
+                            normalized[current] = it_bv->second;
+                        }
+                        else
+                        {
+                            int id = globalVarCounter++;
+                            std::string new_var_name =
+                                "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
+                            Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
+                            boundVar2node[current] = ret;
+                            normalized[current] = ret;
+                        }
+                    }
+                    else
+                    {
+                        // Handle free variable
+                        auto varName = current.toString();
+                        auto it_fv = freeVar2node.find(varName);
+                        if (it_fv != freeVar2node.end())
+                        {
+                            normalized[current] = it_fv->second;
+                        }
+                        else
+                        {
+                            std::vector<Node> cnodes;
+                            int id = freeVar2node.size();
+                            std::string new_var_name =
+                                "v" + std::string(8 - numDigits(id), '0') + std::to_string(id);
+                            cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
+                            Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
+                            cnodes.push_back(gt);
+                            Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(
+                                SkolemFunId::INPUT_VARIABLE, cnodes);
+                            freeVar2node[varName] = ret;
+                            normalized[current] = ret;
+                            d_preprocContext->addSubstitution(current, ret);
+                        }
+                    }
+                }
+                else
+                {
+                    // Constants are unchanged
+                    normalized[current] = current;
+                }
+
+                // Mark as processed and pop from the stack
+                it->second = true;
+                stack.pop();
+            }
+            else
+            {
+                // Non-const, non-var node
+
+                // For quantifiers, process bound variables immediately
+                if (current.getKind() == cvc5::internal::Kind::FORALL ||
+                    current.getKind() == cvc5::internal::Kind::EXISTS)
+                {
+                    Node bound_vars = current[0];
+
+                    // Normalize bound variables and update boundVar2node
+                    std::vector<Node> normalizedBoundVars;
+                    for (size_t i = 0; i < bound_vars.getNumChildren(); ++i)
+                    {
+                        Node bv = bound_vars[i];
+                        auto it_bv = boundVar2node.find(bv);
+                        if (it_bv != boundVar2node.end())
+                        {
+                            normalized[bv] = it_bv->second;
+                        }
+                        else
+                        {
+                            int id = globalVarCounter++;
+                            std::string new_var_name =
+                                "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
+                            Node newBv = nodeManager->mkBoundVar(new_var_name, bv.getType());
+                            boundVar2node[bv] = newBv;
+                            normalized[bv] = newBv;
+                        }
+                        normalizedBoundVars.push_back(normalized[bv]);
+                    }
+
+                    // Replace the bound variables in the quantifier
+                    Node normalizedBoundVarList = nodeManager->mkNode(
+                        cvc5::internal::Kind::BOUND_VAR_LIST, normalizedBoundVars);
+                    normalized[bound_vars] = normalizedBoundVarList;
+                }
+
+                // Push unvisited children onto the stack
+                for (int i = current.getNumChildren() - 1; i >= 0; i--)
+                {
+                    Node child = current[i];
+                    if (visited.find(child) == visited.end())
+                    {
+                        stack.push(child);
+                    }
+                }
+
+                // For APPLY_UF nodes, push the operator
+                if (current.getKind() == cvc5::internal::Kind::APPLY_UF)
+                {
+                    Node op = current.getOperator();
+                    if (visited.find(op) == visited.end())
+                    {
+                        stack.push(op);
+                    }
+                }
+
+                // Leave 'it->second' as false; we'll process this node later
+            }
+        }
+        else if (!it->second)
+        {
+            // Second time seeing this node, process it after its children
+
+            // Prepare children for node creation
+            std::vector<Node> children;
+
+            if (current.getKind() == cvc5::internal::Kind::APPLY_UF)
+            {
+                // Handle operator for APPLY_UF nodes
+                auto opIt = normalized.find(current.getOperator());
+                Assert(opIt != normalized.end());
+                children.push_back(opIt->second);
+            }
+            else if (current.getMetaKind() == metakind::PARAMETERIZED)
+            {
+                // For parameterized nodes, include the operator
+                children.push_back(current.getOperator());
+            }
+
+            // Add normalized children
+            for (size_t i = 0; i < current.getNumChildren(); ++i)
+            {
+                Node child = current[i];
+
+                // For quantifiers, use the normalized bound variable list
+                if ((current.getKind() == cvc5::internal::Kind::FORALL ||
+                     current.getKind() == cvc5::internal::Kind::EXISTS) &&
+                    i == 0)
+                {
+                    // First child is the bound variable list
+                    children.push_back(normalized[child]);
+                    continue;
+                }
+
+                auto childIt = normalized.find(child);
+                Assert(childIt != normalized.end());
+                children.push_back(childIt->second);
+            }
+
+            // Create the new node with normalized children
+            Node ret = nodeManager->mkNode(current.getKind(), children);
+            normalized[current] = ret;
+
+            // Mark as processed and pop from the stack
+            it->second = true;
+            stack.pop();
+        }
+        else
+        {
+            // Node has already been processed
+            stack.pop();
         }
     }
 
