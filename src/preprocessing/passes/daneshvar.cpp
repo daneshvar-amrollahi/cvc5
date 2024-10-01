@@ -392,17 +392,6 @@ Node rename(
             for (size_t i = 0; i < current.getNumChildren(); ++i)
             {
                 Node child = current[i];
-
-                // For quantifiers, use the normalized bound variable list
-                if ((current.getKind() == cvc5::internal::Kind::FORALL ||
-                     current.getKind() == cvc5::internal::Kind::EXISTS) &&
-                    i == 0)
-                {
-                    // First child is the bound variable list
-                    children.push_back(normalized[child]);
-                    continue;
-                }
-
                 auto childIt = normalized.find(child);
                 Assert(childIt != normalized.end());
                 children.push_back(childIt->second);
