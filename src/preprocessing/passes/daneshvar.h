@@ -1,0 +1,91 @@
+/******************************************************************************
+ * Top contributors (to current version):
+ *   Daneshvar Amrollahi
+ *
+ * This file is part of the cvc5 project.
+ *
+ * Copyright (c) 2009-2023 by the authors listed in the file AUTHORS
+ * in the top-level source directory and their institutional affiliations.
+ * All rights reserved.  See the file COPYING in the top-level source
+ * directory for licensing information.
+ * ****************************************************************************
+ *
+ * ToDo: write description
+ */
+
+#include "cvc5_private.h"
+
+#ifndef CVC5__PREPROCESSING__PASSES__DANESHVAR_H
+#define CVC5__PREPROCESSING__PASSES__DANESHVAR_H
+
+#include "preprocessing/preprocessing_pass.h"
+
+namespace cvc5::internal {
+namespace preprocessing {
+namespace passes {
+
+
+
+struct NodeInfo
+{
+  Node node;
+  std::string encoding;          
+  std::map<std::string, int32_t> role;
+
+  uint32_t equivClass;
+  uint32_t id;
+
+  NodeInfo() {}
+
+  NodeInfo(
+    const Node& n, 
+    const std::string& enc, 
+    const std::map<std::string, int32_t>& r, 
+    uint32_t eqClass, 
+    uint32_t i
+  ) : node(n), encoding(enc), role(r), equivClass(eqClass), id(i) {}
+
+  void print() const {
+    std::cout << "Node : " << node << std::endl;
+    std::cout << "Encoding: " << encoding << std::endl;
+    std::cout << "Role: ";
+    for (const auto& [symbol, idx] : role)
+    {
+        std::cout << symbol << " : " << idx << " , ";
+    }
+    std::cout << std::endl;
+  }
+};
+
+
+
+/**
+ * Eliminate all extended string functions in the input problem using
+ * reductions to bounded string quantifiers.
+ */
+class Daneshvar : public PreprocessingPass
+{
+ public:
+  Daneshvar(PreprocessingPassContext* preprocContext);
+
+ protected:
+  PreprocessingPassResult applyInternal(
+      AssertionPipeline* assertionsToPreprocess) override;
+
+private:
+  struct Statistics
+  {
+    
+    TimerStat d_passTime;
+    Statistics(StatisticsRegistry& reg);
+  };
+ 
+  std::unique_ptr<NodeInfo> getNodeInfo(const Node& node, uint32_t id);
+  Statistics d_statistics;
+};
+
+}  // namespace passes
+}  // namespace preprocessing
+}  // namespace cvc5::internal
+
+#endif /* CVC5__PREPROCESSING__PASSES__DANESHVAR_H */
