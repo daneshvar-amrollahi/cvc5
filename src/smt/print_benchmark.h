@@ -87,13 +87,18 @@ class PrintBenchmark
                       const std::vector<Node>& defs,
                       const std::vector<Node>& assertions);
 
+  /**
+   * Mark that the given symbol should not be printed in benchmark outputs.
+   */
+  static void markNoPrint(Node& sym);
+
  private:
   /**
    * print declared symbols in funs but not processed; updates processed to
    * include what was printed
    */
   void printDeclaredFuns(std::ostream& out,
-                         const std::unordered_set<Node>& funs,
+                         const std::vector<Node>& funs,
                          std::unordered_set<Node>& processed);
   /**
    * Get the connected types. This traverses subfield types of datatypes and
