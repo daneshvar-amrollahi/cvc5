@@ -493,6 +493,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     //     for (const auto& ni : eqClass)
     //     {
     //         std::cout << "Node: " << ni->node << std::endl;
+    //         std::cout << "Encoding: " << ni->encoding << std::endl;
+    //         std::cout << std::endl;
     //     }
     //     std::cout << std::endl;
     // }
@@ -503,13 +505,13 @@ PreprocessingPassResult Daneshvar::applyInternal(
     
 
     /////////////////////////////////////////////////////////////
-    // Step 3: Sort nodes based on equivalence classes and super-patterns with customized comparison function
+    // Step 3: Sort nodes based on encodings and super-patterns with customized comparison function
     std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
 
     std::sort(nodeInfos.begin(), nodeInfos.end(),
         [&eqClasses, &pattern](const std::unique_ptr<NodeInfo>& a, const std::unique_ptr<NodeInfo>& b) {
-            if (a->equivClass != b->equivClass) {
-                return a->equivClass < b->equivClass;
+            if (a->encoding != b->encoding) {
+                return a->encoding < b->encoding;
             }
 
             // std::cout << "Comparing " << a->node << " and " << b->node << std::endl;
