@@ -55,8 +55,12 @@ void generateEncoding(
     std::unordered_map<Node, bool> visited;           // Map to keep track of visited nodes
     std::unordered_map<Node, uint32_t> subtreeIdMap;  // Map from Nodes to their IDs
     std::unordered_map<std::string, uint32_t> symbolMap;
-    uint32_t idCounter = 1;                           // Counter to assign IDs to subtrees and variables
+    uint32_t varIdCounter = 1;                           // Counter to assign IDs to subtrees and variables
+    uint32_t subtreeIdCounter = 1;
     int32_t cnt = 0;                                 // Counter for roles
+
+    // Data structure to collect node encodings
+    std::vector<std::string> nodeEncodings;
 
     // Initialize the stack with the root node
     stack.push(root);
@@ -107,7 +111,7 @@ void generateEncoding(
             {
                 // Operator node
                 // Assign an ID to this node
-                uint32_t id = idCounter++;
+                uint32_t id = subtreeIdCounter++;
                 subtreeIdMap[n] = id;
 
                 // Build the encoding string
@@ -141,7 +145,7 @@ void generateEncoding(
                         // Assign ID to variable if not already assigned
                         if (symbolMap.find(symbol) == symbolMap.end())
                         {
-                            symbolMap[symbol] = idCounter++;
+                            symbolMap[symbol] = varIdCounter++;
                         }
 
                         // Include variable ID
@@ -164,8 +168,8 @@ void generateEncoding(
 
                 nodeEncoding += ";";
 
-                // Concatenate the encoding directly
-                encoding += nodeEncoding;
+                // Collect the encoding instead of concatenating
+                nodeEncodings.push_back(nodeEncoding);
 
                 // Mark as processed and pop
                 it->second = true;
@@ -177,6 +181,12 @@ void generateEncoding(
             // Node has already been processed
             stack.pop();
         }
+    }
+
+    // Concatenate the node encodings in reverse order
+    for (auto it = nodeEncodings.rbegin(); it != nodeEncodings.rend(); ++it)
+    {
+        encoding += *it;
     }
 }
 
@@ -594,6 +604,14 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////
 
     // std::cout << "renaming" << std::endl;
+
+    // for (const auto&ni: nodeInfos)
+    // {
+    //     std::cout << "Node: " << ni->node << std::endl;
+    //     std::cout << "Encoding: " << ni->encoding << std::endl;
+    // //     std::cout << std::endl;
+    // }
+
 
     //////////////////////////////////////////////////////////////////////
     // Step 4: Normalize the nodes based on the sorted order
