@@ -195,12 +195,12 @@ void generateEncoding(
 
 
 
-std::unique_ptr<NodeInfo> Daneshvar::getNodeInfo(const Node& node, uint32_t id)
+std::unique_ptr<NodeInfo> Daneshvar::getNodeInfo(const Node& node)
 {
     std::string encoding;
     std::map<std::string, int32_t> role;
     generateEncoding(node, encoding, role);
-    return std::make_unique<NodeInfo>(node, encoding, role, 0, id);
+    return std::make_unique<NodeInfo>(node, encoding, 0, role);
 }
 
 
@@ -447,15 +447,14 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     
     
-    std::vector<std::unique_ptr<NodeInfo>> nodeInfos;
+    std::vector<std::shared_ptr<NodeInfo>> nodeInfos;
 
     /////////////////////////////////////////////////////////////
     // Step 1: Extract NodeInfo for each assertion
-    uint32_t nextId = 0; 
     for (const Node& assertion : assertionsToPreprocess->ref())
     {
         // std::cout << "Assertion: " << assertion << std::endl;
-        auto ni = getNodeInfo(assertion, nextId++);
+        auto ni = getNodeInfo(assertion);
         nodeInfos.push_back(std::move(ni));
         // std::cout << std::endl;
     }
@@ -470,169 +469,147 @@ PreprocessingPassResult Daneshvar::applyInternal(
     // /////////////////////////////////////////////////////////////
 
     
-
     /////////////////////////////////////////////////////////////
     // Step 2: Classify assertions into equivalence classes
-    // Use NodeInfo pointers in eqClasses
-    std::map<uint32_t, std::vector<NodeInfo*>> eqClasses;
-
-    for (auto& niPtr : nodeInfos)
-    {
+    std::vector<std::vector<NodeInfo*>> eqClasses;
+    std::unordered_map<std::string, uint32_t> seenEncodings;
+    for (auto& niPtr : nodeInfos) {
         NodeInfo* current = niPtr.get();
-        bool found = false;
-        for (auto& [ec, eqClass] : eqClasses)
-        {
-            if (sameClass(*current, *eqClass[0]))
-            {
-                eqClass.push_back(current);
-                current->equivClass = ec;
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-        {
-            eqClasses[current->id] = { current };
-            current->equivClass = current->id;
+        auto it = seenEncodings.find(current->encoding);
+        if (it != seenEncodings.end()) {
+            eqClasses[it->second].push_back(current);
+        } else {
+            seenEncodings[current->encoding] = eqClasses.size();
+            std::vector<NodeInfo*> newClass;
+            newClass.push_back(current);
+            eqClasses.push_back(std::move(newClass));
         }
     }
 
-    // for (const auto& [ec, eqClass] : eqClasses)
+    // Step 3: Sort equivalence classes based on encodings
+    std::sort(eqClasses.begin(), eqClasses.end(),
+        [](const std::vector<NodeInfo*>& a, const std::vector<NodeInfo*>& b) {
+            return a[0]->encoding > b[0]->encoding;
+        });
+
+    // Set equivalence class IDs (never used)
+    // for (uint32_t i = 0; i < eqClasses.size(); ++i) {
+    //     for (const auto& ni : eqClasses[i]) {
+    //         ni->equivClass = i;
+    //     }
+    // }
+        
+
+    /////////////////////////////////////////////////////////////
+
+
+    
+
+    /////////////////////////////////////////////////////////////
+    // Step 4: Sort within equivalence classes
+    std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
+
+    for (auto& eqClass : eqClasses) {
+        std::sort(eqClass.begin(), eqClass.end(),
+            [&eqClasses, &pattern](NodeInfo* a, NodeInfo* b) {
+                // Since all nodes in eqClass have the same encoding, we don't need to compare 'encoding'
+
+                // Iterate over roles in parallel
+                auto itA = a->role.begin();
+                auto itB = b->role.begin();
+
+                while (itA != a->role.end() && itB != b->role.end()) {
+                    const std::string& symbolA = itA->first;
+                    const std::string& symbolB = itB->first;
+
+                    // Compute or retrieve patterns only once for each symbol
+                    auto getOrComputePattern = [&](const std::string& symbol) -> const std::vector<int32_t>& {
+                        auto it = pattern.find(symbol);
+                        if (it != pattern.end()) {
+                            return it->second;
+                        }
+
+                        std::vector<int32_t> pat;
+                        for (const auto& eqClassInner : eqClasses) {
+                            std::vector<int32_t> roles;
+                            for (const NodeInfo* ni : eqClassInner) {
+                                auto roleIt = ni->role.find(symbol);
+                                roles.push_back(roleIt != ni->role.end() ? roleIt->second : static_cast<int32_t>(-1));
+                            }
+
+                            std::sort(roles.begin(), roles.end());
+                            pat.insert(pat.end(), roles.begin(), roles.end());
+                        }
+
+                        // Cache the computed pattern
+                        pattern[symbol] = std::move(pat);
+                        return pattern[symbol];
+                    };
+
+                    // Retrieve patterns for both symbols
+                    const std::vector<int32_t>& pat_a = getOrComputePattern(symbolA);
+                    const std::vector<int32_t>& pat_b = getOrComputePattern(symbolB);
+
+                    // Compare patterns
+                    size_t minPatSize = std::min(pat_a.size(), pat_b.size());
+                    for (size_t j = 0; j < minPatSize; ++j) {
+                        if (pat_a[j] != pat_b[j]) {
+                            return pat_a[j] < pat_b[j];
+                        }
+                    }
+
+                    ++itA;
+                    ++itB;
+                }
+
+                // Handle cases where one iterator reaches the end before the other
+                if (itA != a->role.end()) return true;
+                if (itB != b->role.end()) return false;
+
+                return false;
+            });
+    }
+
+
+
+
+    // std::cout << "renaming" << std::endl;
+
+    // for (const auto& eqClass : eqClasses)
     // {
-    //     std::cout << "Equivalence class " << ec << std::endl;
     //     for (const auto& ni : eqClass)
     //     {
     //         std::cout << "Node: " << ni->node << std::endl;
     //         std::cout << "Encoding: " << ni->encoding << std::endl;
+    //         std::cout << "Role: ";
+    //         for (const auto& [symbol, idx] : ni->role)
+    //         {
+    //              std::cout << symbol << " : " << idx << " , ";
+    //         }
     //         std::cout << std::endl;
     //     }
     //     std::cout << std::endl;
     // }
 
-    /////////////////////////////////////////////////////////////
-
-
-    
-
-    /////////////////////////////////////////////////////////////
-    // Step 3: Sort nodes based on encodings and super-patterns with customized comparison function
-    std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
-
-    std::sort(nodeInfos.begin(), nodeInfos.end(),
-        [&eqClasses, &pattern](const std::unique_ptr<NodeInfo>& a, const std::unique_ptr<NodeInfo>& b) {
-            if (a->encoding != b->encoding) {
-                return a->encoding < b->encoding;
-            }
-
-            // std::cout << "Comparing " << a->node << " and " << b->node << std::endl;
-
-
-            // Iterating over roles in parallel since their sizes are guaranteed to be the same.
-            auto itA = a->role.begin();
-            auto itB = b->role.begin();
-
-            while (itA != a->role.end() && itB != b->role.end()) {
-                const std::string& symbolA = itA->first; 
-                const std::string& symbolB = itB->first; 
-
-
-                // Compute or retrieve patterns only once for each key
-                auto getOrComputePattern = [&](const std::string& symbol) -> std::vector<int32_t> {
-                    auto it = pattern.find(symbol);
-                    if (it != pattern.end()) {
-                        return it->second;
-                    }
-
-                    std::vector<int32_t> pat;
-                    for (const auto& [ec, eqClass] : eqClasses) {
-                        std::vector<int32_t> roles;
-                        for (const NodeInfo* ni : eqClass) {
-                            auto roleIt = ni->role.find(symbol);
-                            roles.push_back(roleIt != ni->role.end() ? roleIt->second : static_cast<int32_t>(-1));
-                        }
-
-                        std::sort(roles.begin(), roles.end());
-                        pat.insert(pat.end(), roles.begin(), roles.end());
-                    }
-
-                    pattern[symbol] = pat;
-                    return pat;
-                };
-
-                // Retrieve patterns for both roles only once per iteration
-                const std::vector<int32_t>& pat_a = getOrComputePattern(symbolA);
-                const std::vector<int32_t>& pat_b = getOrComputePattern(symbolB);
-
-                // std::cout << "Symbol A: " << symbolA << std::endl;
-                // std::cout << "Symbol B: " << symbolB << std::endl;
-
-                // std::cout << "Pattern A: ";
-                // for (const auto& p : pat_a)
-                // {
-                //     std::cout << p << " ";
-                // }
-                // std::cout << std::endl;
-                // std::cout << "Pattern B: ";
-                // for (const auto& p : pat_b)
-                // {
-                //     std::cout << p << " ";
-                // }
-                // std::cout << std::endl << std::endl;
-
-                // Compare patterns
-                size_t minPatSize = std::min(pat_a.size(), pat_b.size());
-                for (size_t j = 0; j < minPatSize; ++j) {
-                    if (pat_a[j] != pat_b[j]) {
-                        return pat_a[j] < pat_b[j];
-                    }
-                }
-
-                ++itA;
-                ++itB;
-            }
-
-            return false;
-        });
-    
-    // /*
-    // // for (const auto&ni: nodeInfos)
-    // // {
-    // //     if (ni)
-    // //         ni->print();
-    // //     std::cout << std::endl;
-    // // }
-    /////////////////////////////////////////////////////////////
-
-    // std::cout << "renaming" << std::endl;
-
-    // for (const auto&ni: nodeInfos)
-    // {
-    //     std::cout << "Node: " << ni->node << std::endl;
-    //     std::cout << "Encoding: " << ni->encoding << std::endl;
-    // //     std::cout << std::endl;
-    // }
-
 
     //////////////////////////////////////////////////////////////////////
-    // Step 4: Normalize the nodes based on the sorted order
+    // Step 5: Normalize the nodes based on the sorted order
     std::unordered_map<Node, Node> freeVar2node;
-    // std::unordered_map<std::string, Node> boundVar2node;
     std::unordered_map<Node, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
     std::vector<Node> normalizedNodes;
-    for (size_t i = 0; i < nodeInfos.size(); ++i)
+    for (const auto& eqClass : eqClasses)
     {
-        Node renamed = rename(nodeInfos[i]->node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);
-        normalizedNodes.push_back(renamed);
+        for (const auto& ni : eqClass)
+        {
+            Node renamed = rename(ni->node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);            
+            normalizedNodes.push_back(renamed);
+        }
     }
-    //////////////////////////////////////////////////////////////////////
 
-    // std::cout << "Renamed nodes" << std::endl;
 
-    
-    for (uint32_t i = 0; i < nodeInfos.size(); ++i)
+    for (uint32_t i = 0; i < normalizedNodes.size(); ++i)
     {
-        // std::cout << "Normalized Node " << i << ": " << normalizedNodes[i] << std::endl;
         assertionsToPreprocess->replace(i, normalizedNodes[i]);
     }
     

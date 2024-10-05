@@ -29,21 +29,18 @@ namespace passes {
 struct NodeInfo
 {
   Node node;
-  std::string encoding;          
+  std::string encoding;  
+  uint32_t equivClass;        
   std::map<std::string, int32_t> role;
-
-  uint32_t equivClass;
-  uint32_t id;
 
   NodeInfo() {}
 
   NodeInfo(
     const Node& n, 
     const std::string& enc, 
-    const std::map<std::string, int32_t>& r, 
-    uint32_t eqClass, 
-    uint32_t i
-  ) : node(n), encoding(enc), role(r), equivClass(eqClass), id(i) {}
+    uint32_t eqClass,
+    const std::map<std::string, int32_t>& r 
+  ) : node(n), encoding(enc), equivClass(eqClass), role(r) {}
 
   void print() const {
     std::cout << "Node : " << node << std::endl;
@@ -80,7 +77,7 @@ private:
     Statistics(StatisticsRegistry& reg);
   };
  
-  std::unique_ptr<NodeInfo> getNodeInfo(const Node& node, uint32_t id);
+  std::unique_ptr<NodeInfo> getNodeInfo(const Node& node);
   Statistics d_statistics;
 };
 
