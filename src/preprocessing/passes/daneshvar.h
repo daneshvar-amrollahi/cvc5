@@ -31,7 +31,8 @@ struct NodeInfo
   Node node;
   std::string encoding;  
   uint32_t equivClass;        
-  std::map<std::string, int32_t> role;
+  std::map<std::string, int32_t> role; // First occurence index (counter) of each symbol when traversing the DAG
+  std::vector<std::pair<std::string, int32_t>> varNames;
 
   NodeInfo() {}
 

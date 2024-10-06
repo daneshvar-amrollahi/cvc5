@@ -52,12 +52,12 @@ void generateEncoding(
     std::map<std::string, int32_t>& role)
 {
     std::stack<Node> stack;
-    std::unordered_map<Node, bool> visited;           // Map to keep track of visited nodes
-    std::unordered_map<Node, uint32_t> subtreeIdMap;  // Map from Nodes to their IDs
+    std::unordered_map<Node, bool> visited;
+    std::unordered_map<Node, uint32_t> subtreeIdMap;
     std::unordered_map<std::string, uint32_t> symbolMap;
-    uint32_t varIdCounter = 1;                           // Counter to assign IDs to subtrees and variables
+    uint32_t varIdCounter = 1;
     uint32_t subtreeIdCounter = 1;
-    int32_t cnt = 0;                                 // Counter for roles
+    int32_t cnt = 0;
 
     // Data structure to collect node encodings
     std::vector<std::string> nodeEncodings;
@@ -76,7 +76,7 @@ void generateEncoding(
             if (!n.isVar() && !n.isConst())
             {
                 // Operator node
-                // Push its unvisited children onto the stack
+                // for (size_t i = n.getNumChildren(); i-- > 0;)
                 for (size_t i = 0; i < n.getNumChildren(); ++i)
                 {
                     Node child = n[i];
@@ -231,6 +231,7 @@ Node rename(
     const Node& n,
     std::unordered_map<Node, Node>& freeVar2node,
     std::unordered_map<Node, Node>& boundVar2node,
+    std::unordered_map<std::string, std::string>& normalizedName,
     NodeManager* nodeManager,
     PreprocessingPassContext* d_preprocContext)
 {
@@ -279,6 +280,8 @@ Node rename(
                             Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
                             boundVar2node[current] = ret;
                             normalized[current] = ret;
+
+                            normalizedName[current.toString()] = new_var_name;
                         }
                     }
                     else
@@ -303,6 +306,8 @@ Node rename(
                             freeVar2node[current] = ret;
                             normalized[current] = ret;
                             d_preprocContext->addSubstitution(current, ret);
+
+                            normalizedName[current.toString()] = new_var_name;
                         }
                     }
                 }
@@ -504,7 +509,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
     
-
     /////////////////////////////////////////////////////////////
     // Step 4: Sort within equivalence classes
     std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
@@ -597,13 +601,96 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::unordered_map<Node, Node> freeVar2node;
     std::unordered_map<Node, Node> boundVar2node;
     NodeManager* nodeManager = NodeManager::currentNM();
+    std::unordered_map<std::string, std::string> normalizedName;
+
+    for (const auto& eqClass : eqClasses)
+    {
+        for (const auto& ni : eqClass)
+        {            
+            Node renamed = rename(ni->node, freeVar2node, boundVar2node, normalizedName, nodeManager, d_preprocContext);  
+            ni->node = renamed;          
+        }
+    }
+
+    // std::cout << "**********************************************" << std::endl;
+    // for (auto it = normalizedName.begin(); it != normalizedName.end(); ++it)
+    // {
+    //     std::cout << it->first << " : " << it->second << std::endl;
+    // }
+    // std::cout << "**********************************************" << std::endl;
+
+    // std::cout << "Doing final sort" << std::endl;
+
+    //////////////////////////////////////////////////////////////////////
+    // Step 6: Sort the ndoes within each equivalence class based on the normalized node names
+    for (auto& eqClass : eqClasses)
+    {
+        std::sort(eqClass.begin(), eqClass.end(),
+            [&normalizedName](NodeInfo* a, NodeInfo* b) {
+                // Loop on the roles, retrieve the normalized names and compare them
+
+                // std::cout << "Comparing" << std::endl;
+                // std::cout << "Node A: " << a->node << std::endl;
+                // std::cout << "Roles A: ";
+                // for (const auto& [symbol, idx] : a->role)
+                // {
+                //     std::cout << symbol << " : " << idx << " , ";
+                // }
+                // std::cout << "Node B: " << b->node << std::endl;
+                // std::cout << "Roles B: ";
+                // for (const auto& [symbol, idx] : b->role)
+                // {
+                //     std::cout << symbol << " : " << idx << " , ";
+                // }
+
+                // Calculate varNames list if not already done
+                // varNames: value of (key,value) in role map in ascending order
+                if (a->varNames.empty())
+                {
+                    std::vector<std::pair<std::string, int32_t>> elements(a->role.begin(), a->role.end());
+                    std::sort(elements.begin(), elements.end(), 
+                        [](const std::pair<std::string, int32_t>& A, const std::pair<std::string, int32_t>& B) {
+                            return A.second < B.second;
+                        });
+                    a->varNames = std::move(elements);
+                }
+                if (b->varNames.empty())
+                {
+                    std::vector<std::pair<std::string, int32_t>> elements(b->role.begin(), b->role.end());
+                    std::sort(elements.begin(), elements.end(), 
+                        [](const std::pair<std::string, int32_t>& A, const std::pair<std::string, int32_t>& B) {
+                            return A.second < B.second;
+                        });
+                    b->varNames = std::move(elements);
+                }
+                //varNames has old names before renaming. We need to sort based on the new names
+
+                size_t sz = std::min(a->varNames.size(), b->varNames.size()); // They are the same size
+                for (size_t i = 0; i < sz; ++i)
+                {
+                    const std::string& symbolA = a->varNames[i].first;
+                    const std::string& symbolB = b->varNames[i].first;
+                    const std::string& normNameA = normalizedName[symbolA];
+                    const std::string& normNameB = normalizedName[symbolB];
+                    // std::cout << normNameA << " ? " << normNameB << std::endl;
+                    if (normNameA != normNameB)
+                    {
+                        return normNameA < normNameB;
+                    }
+                }
+
+                return false;
+            });
+    }
+    ///////////////////////////////////////////////////////////////////////
+
+
     std::vector<Node> normalizedNodes;
     for (const auto& eqClass : eqClasses)
     {
         for (const auto& ni : eqClass)
         {
-            Node renamed = rename(ni->node, freeVar2node, boundVar2node, nodeManager, d_preprocContext);            
-            normalizedNodes.push_back(renamed);
+            normalizedNodes.push_back(ni->node);
         }
     }
 
