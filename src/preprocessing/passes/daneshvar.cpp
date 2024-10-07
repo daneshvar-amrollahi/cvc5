@@ -435,7 +435,18 @@ Node rename(
 
 
 
-
+bool isTrivialEquality(const Node& n)
+{
+    if (n.getKind() == cvc5::internal::Kind::EQUAL)
+    {
+        const auto& lhs = n[0], rhs = n[1];
+        if (lhs == rhs)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 
 
@@ -450,14 +461,13 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
     // std::cout << "STARTING DANESHVAR PASS" << std::endl; 
 
-    
-    
     std::vector<std::shared_ptr<NodeInfo>> nodeInfos;
-
-    /////////////////////////////////////////////////////////////
-    // Step 1: Extract NodeInfo for each assertion
     for (const Node& assertion : assertionsToPreprocess->ref())
     {
+        if (isTrivialEquality(assertion))
+        {
+            continue;
+        }
         // std::cout << "Assertion: " << assertion << std::endl;
         auto ni = getNodeInfo(assertion);
         nodeInfos.push_back(std::move(ni));
@@ -577,25 +587,6 @@ PreprocessingPassResult Daneshvar::applyInternal(
 
 
 
-    // std::cout << "renaming" << std::endl;
-
-    // for (const auto& eqClass : eqClasses)
-    // {
-    //     for (const auto& ni : eqClass)
-    //     {
-    //         std::cout << "Node: " << ni->node << std::endl;
-    //         std::cout << "Encoding: " << ni->encoding << std::endl;
-    //         std::cout << "Role: ";
-    //         for (const auto& [symbol, idx] : ni->role)
-    //         {
-    //              std::cout << symbol << " : " << idx << " , ";
-    //         }
-    //         std::cout << std::endl;
-    //     }
-    //     std::cout << std::endl;
-    // }
-
-
     //////////////////////////////////////////////////////////////////////
     // Step 5: Normalize the nodes based on the sorted order
     std::unordered_map<Node, Node> freeVar2node;
@@ -694,7 +685,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
         }
     }
 
-
+    assertionsToPreprocess->resize(normalizedNodes.size());
     for (uint32_t i = 0; i < normalizedNodes.size(); ++i)
     {
         assertionsToPreprocess->replace(i, normalizedNodes[i]);
