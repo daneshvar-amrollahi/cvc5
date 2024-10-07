@@ -76,7 +76,6 @@ void generateEncoding(
             if (!n.isVar() && !n.isConst())
             {
                 // Operator node
-                // for (size_t i = n.getNumChildren(); i-- > 0;)
                 for (size_t i = 0; i < n.getNumChildren(); ++i)
                 {
                     Node child = n[i];
@@ -88,7 +87,19 @@ void generateEncoding(
             }
             else
             {
-                // For variables and constants, mark as processed immediately
+                // For variables and constants, update role map and mark as processed immediately
+                if (n.isVar())
+                {
+                    // Update role map
+                    std::string symbol = n.toString();
+                    if (role.find(symbol) == role.end())
+                    {
+                        role[symbol] = cnt;
+                    }
+                    cnt++; // Increment cnt whether variable is new or not
+                }
+
+
                 it->second = true;
                 stack.pop();
             }
@@ -109,7 +120,21 @@ void generateEncoding(
             }
             else
             {
-                // Operator node
+                
+                if (n.hasOperator())
+                {
+                    Node opNode = n.getOperator();
+                    if (opNode.isVar())
+                    {
+                        std::string symbol = opNode.toString();
+                        if (role.find(symbol) == role.end())
+                        {
+                            role[symbol] = cnt;
+                        }
+                        cnt++; // Increment cnt whether variable is new or not
+                    }
+                }
+
                 // Assign an ID to this node
                 uint32_t id = subtreeIdCounter++;
                 subtreeIdMap[n] = id;
@@ -123,7 +148,7 @@ void generateEncoding(
                 nodeEncoding += opKind + ",";
 
                 // For each child, include appropriate encoding
-                for (size_t i = 0; i < n.getNumChildren(); ++i)
+                for (size_t i = n.getNumChildren(); i-- > 0;)
                 {
                     Node child = n[i];
                     if (child.isConst())
@@ -195,12 +220,20 @@ void generateEncoding(
 
 
 
+
 std::unique_ptr<NodeInfo> Daneshvar::getNodeInfo(const Node& node)
 {
     std::string encoding;
     std::map<std::string, int32_t> role;
     generateEncoding(node, encoding, role);
-    return std::make_unique<NodeInfo>(node, encoding, 0, role);
+
+    std::vector<std::pair<std::string, int32_t>> elements(role.begin(), role.end());
+        std::sort(elements.begin(), elements.end(), 
+            [](const std::pair<std::string, int32_t>& A, const std::pair<std::string, int32_t>& B) {
+                return A.second > B.second;
+            });
+
+    return std::make_unique<NodeInfo>(node, encoding, 0, role, elements);
 }
 
 
@@ -518,6 +551,16 @@ PreprocessingPassResult Daneshvar::applyInternal(
     /////////////////////////////////////////////////////////////
 
 
+    // for (const auto& eqClass : eqClasses)
+    // {
+    //     for (const auto& ni : eqClass)
+    //     {
+    //         ni->print();
+    //         std::cout << std::endl;
+    //     }
+    // }
+    // std::cout << std::endl;
+
     
     /////////////////////////////////////////////////////////////
     // Step 4: Sort within equivalence classes
@@ -528,13 +571,17 @@ PreprocessingPassResult Daneshvar::applyInternal(
             [&eqClasses, &pattern](NodeInfo* a, NodeInfo* b) {
                 // Since all nodes in eqClass have the same encoding, we don't need to compare 'encoding'
 
-                // Iterate over roles in parallel
-                auto itA = a->role.begin();
-                auto itB = b->role.begin();
+                // std::cout << "Comparing" << std::endl;
+                // std::cout << "Node A: " << a->node << std::endl;
+                // std::cout << "Node B: " << b->node << std::endl;
 
-                while (itA != a->role.end() && itB != b->role.end()) {
-                    const std::string& symbolA = itA->first;
-                    const std::string& symbolB = itB->first;
+                // Iterate over varNames in parallel
+                auto itA = a->varNames.begin();
+                auto itB = b->varNames.begin();
+
+                while (itA != a->varNames.end() && itB != b->varNames.end()) {
+                    const std::string& symbolA = itA->first; // varNames stores pairs, first is the symbol
+                    const std::string& symbolB = itB->first; // varNames stores pairs, first is the symbol
 
                     // Compute or retrieve patterns only once for each symbol
                     auto getOrComputePattern = [&](const std::string& symbol) -> const std::vector<int32_t>& {
@@ -564,10 +611,22 @@ PreprocessingPassResult Daneshvar::applyInternal(
                     const std::vector<int32_t>& pat_a = getOrComputePattern(symbolA);
                     const std::vector<int32_t>& pat_b = getOrComputePattern(symbolB);
 
+                    // std::cout << "pattern for " << symbolA << " : ";
+                    // for (const auto& p : pat_a) {
+                    //     std::cout << p << " , ";
+                    // }
+                    // std::cout << std::endl;
+                    // std::cout << "pattern for " << symbolB << " : ";
+                    // for (const auto& p : pat_b) {
+                    //     std::cout << p << " , ";
+                    // }
+                    // std::cout << std::endl << "--------" << std::endl;
+
                     // Compare patterns
                     size_t minPatSize = std::min(pat_a.size(), pat_b.size());
                     for (size_t j = 0; j < minPatSize; ++j) {
                         if (pat_a[j] != pat_b[j]) {
+                            // std::cout << "Distinguished!" << std::endl << std::endl;
                             return pat_a[j] < pat_b[j];
                         }
                     }
@@ -577,8 +636,10 @@ PreprocessingPassResult Daneshvar::applyInternal(
                 }
 
                 // Handle cases where one iterator reaches the end before the other
-                if (itA != a->role.end()) return true;
-                if (itB != b->role.end()) return false;
+                if (itA != a->varNames.end()) return true;
+                if (itB != b->varNames.end()) return false;
+
+                // std::cout << "Not Distinguished!" << std::endl << std::endl;
 
                 return false;
             });
@@ -634,26 +695,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
                 //     std::cout << symbol << " : " << idx << " , ";
                 // }
 
-                // Calculate varNames list if not already done
-                // varNames: value of (key,value) in role map in ascending order
-                if (a->varNames.empty())
-                {
-                    std::vector<std::pair<std::string, int32_t>> elements(a->role.begin(), a->role.end());
-                    std::sort(elements.begin(), elements.end(), 
-                        [](const std::pair<std::string, int32_t>& A, const std::pair<std::string, int32_t>& B) {
-                            return A.second < B.second;
-                        });
-                    a->varNames = std::move(elements);
-                }
-                if (b->varNames.empty())
-                {
-                    std::vector<std::pair<std::string, int32_t>> elements(b->role.begin(), b->role.end());
-                    std::sort(elements.begin(), elements.end(), 
-                        [](const std::pair<std::string, int32_t>& A, const std::pair<std::string, int32_t>& B) {
-                            return A.second < B.second;
-                        });
-                    b->varNames = std::move(elements);
-                }
+                
                 //varNames has old names before renaming. We need to sort based on the new names
 
                 size_t sz = std::min(a->varNames.size(), b->varNames.size()); // They are the same size

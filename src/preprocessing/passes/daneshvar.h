@@ -40,14 +40,21 @@ struct NodeInfo
     const Node& n, 
     const std::string& enc, 
     uint32_t eqClass,
-    const std::map<std::string, int32_t>& r 
-  ) : node(n), encoding(enc), equivClass(eqClass), role(r) {}
+    const std::map<std::string, int32_t>& r,
+    const std::vector<std::pair<std::string, int32_t>>& vn
+  ) : node(n), encoding(enc), equivClass(eqClass), role(r), varNames(vn) {}
 
   void print() const {
     std::cout << "Node : " << node << std::endl;
     std::cout << "Encoding: " << encoding << std::endl;
     std::cout << "Role: ";
     for (const auto& [symbol, idx] : role)
+    {
+        std::cout << symbol << " : " << idx << " , ";
+    }
+    std::cout << std::endl;
+    std::cout << "VarNames: ";
+    for (const auto& [symbol, idx] : varNames)
     {
         std::cout << symbol << " : " << idx << " , ";
     }
