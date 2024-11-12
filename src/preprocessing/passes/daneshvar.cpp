@@ -564,6 +564,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     
     /////////////////////////////////////////////////////////////
     // Step 4: Sort within equivalence classes
+    std::cout << "Sorting within equivalence classes" << std::endl;
     std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
 
     for (auto& eqClass : eqClasses) {
@@ -591,15 +592,47 @@ PreprocessingPassResult Daneshvar::applyInternal(
                         }
 
                         std::vector<int32_t> pat;
+                        uint32_t ecId = 0;
+
                         for (const auto& eqClassInner : eqClasses) {
+                            ecId++;
                             std::vector<int32_t> roles;
+                            // roles.push_back(ecId);
+                            // roles.push_back(-999);
+                            bool found = false;
+
+                            std::map<int32_t, uint32_t> roleCounter;
+
                             for (const NodeInfo* ni : eqClassInner) {
                                 auto roleIt = ni->role.find(symbol);
-                                roles.push_back(roleIt != ni->role.end() ? roleIt->second : static_cast<int32_t>(-1));
+                                // roles.push_back(roleIt != ni->role.end() ? roleIt->second : static_cast<int32_t>(-1));
+                                // std::sort(roles.begin(), roles.end());
+                                // pat.insert(pat.end(), roles.begin(), roles.end());
+                                if (roleIt != ni->role.end()) {
+                                    // roles.push_back(roleIt->second);
+                                    roleCounter[roleIt->second]++;
+                                    found = true;
+                                }
+                                else
+                                {
+                                    // roles.push_back(-1);
+                                    roleCounter[-1]++;
+                                }
                             }
 
-                            std::sort(roles.begin(), roles.end());
-                            pat.insert(pat.end(), roles.begin(), roles.end());
+
+                            if (found) {
+                                pat.push_back(ecId);
+                                for (const auto& [role, count] : roleCounter)
+                                {
+                                    pat.push_back(role);
+                                    pat.push_back(-count);
+                                }
+
+                                // std::sort(roles.begin() + 2, roles.end());
+                                // pat.insert(pat.end(), roles.begin(), roles.end());
+                            }
+                            
                         }
 
                         // Cache the computed pattern
@@ -611,10 +644,15 @@ PreprocessingPassResult Daneshvar::applyInternal(
                     const std::vector<int32_t>& pat_a = getOrComputePattern(symbolA);
                     const std::vector<int32_t>& pat_b = getOrComputePattern(symbolB);
 
-                    // std::cout << "pattern for " << symbolA << " : ";
-                    // for (const auto& p : pat_a) {
-                    //     std::cout << p << " , ";
-                    // }
+                    /*
+                    std::cout << "pattern for " << symbolA << " : ";
+                    for (const auto& p : pat_a) {
+                        if (p == -999)
+                            std::cout << " ||||| ";
+                        else
+                            std::cout << p << " , ";
+                    }
+                    */
                     // std::cout << std::endl;
                     // std::cout << "pattern for " << symbolB << " : ";
                     // for (const auto& p : pat_b) {
@@ -645,7 +683,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
             });
     }
 
-
+    std::cout << "Finished sorting within equivalence classes" << std::endl;
 
 
     //////////////////////////////////////////////////////////////////////
@@ -734,7 +772,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
     
     
-    // std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on passg
+    std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on passg
 
     
 
