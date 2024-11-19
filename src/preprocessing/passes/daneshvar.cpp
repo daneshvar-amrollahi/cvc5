@@ -1,4 +1,4 @@
-    /******************************************************************************
+/******************************************************************************
  * Top contributors (to current version):
  *   Daneshvar Amrollahi
  *
@@ -23,8 +23,10 @@
 #include "expr/sort_to_term.h"
 #include "util/string.h"
 #include "expr/node_converter.h"
+#include "expr/node_algorithm.h"
 #include "util/statistics_registry.h"
 #include "preprocessing/preprocessing_pass_context.h" 
+#include "expr/cardinality_constraint.h"
 
 #include <map>
 #include <unordered_map>
@@ -265,6 +267,7 @@ Node rename(
     std::unordered_map<Node, Node>& freeVar2node,
     std::unordered_map<Node, Node>& boundVar2node,
     std::unordered_map<std::string, std::string>& normalizedName,
+    std::map<TypeNode, TypeNode> normalizedSorts,
     NodeManager* nodeManager,
     PreprocessingPassContext* d_preprocContext)
 {
@@ -310,7 +313,9 @@ Node rename(
                             int id = globalVarCounter++;
                             std::string new_var_name =
                                 "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
-                            Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
+                            // Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
+                            Node ret = nodeManager->mkBoundVar(new_var_name, normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType());
+
                             boundVar2node[current] = ret;
                             normalized[current] = ret;
 
@@ -332,7 +337,8 @@ Node rename(
                             std::string new_var_name =
                                 "v" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                             cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
-                            Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
+                            // Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
+                            Node gt = nodeManager->mkConst(SortToTerm(normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType()));
                             cnodes.push_back(gt);
                             Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(
                                 SkolemFunId::INPUT_VARIABLE, cnodes);
@@ -483,6 +489,54 @@ bool isTrivialEquality(const Node& n)
 
 
 
+
+// Same as getTypes. But this one colelcts types in a vector instead of an unordered_set
+
+void collectTypes(TNode n,
+              std::vector<TypeNode>& types,
+              std::unordered_set<TNode>& visited,
+              std::unordered_set<TypeNode>& mark
+              )
+{
+  std::unordered_set<TNode>::iterator it;
+  std::vector<TNode> visit;
+  TNode cur;
+  visit.push_back(n);
+  do
+  {
+    cur = visit.back();
+    visit.pop_back();
+    it = visited.find(cur);
+    if (it == visited.end())
+    {
+      visited.insert(cur);
+
+
+      if (mark.find(cur.getType()) == mark.end())
+      {
+        // std::cout << "Found new type " << cur.getType() << std::endl;
+        mark.insert(cur.getType());
+        types.push_back(cur.getType());
+      }
+
+      
+      // special cases where the type is not part of the AST
+      if (cur.getKind() == Kind::CARDINALITY_CONSTRAINT)
+      {
+
+        if (mark.find(cur.getOperator().getConst<CardinalityConstraint>().getType()) == mark.end())
+        {
+            mark.insert(
+                cur.getOperator().getConst<CardinalityConstraint>().getType());
+            types.push_back(
+                cur.getOperator().getConst<CardinalityConstraint>().getType());
+        }
+
+      }
+      visit.insert(visit.end(), cur.begin(), cur.end());
+    }
+  } while (!visit.empty());
+}
 
 
 
@@ -646,7 +700,26 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
 
 
-
+    std::vector<TypeNode> types;
+    std::unordered_set<TNode> visited;
+    std::unordered_set<TypeNode> mark;
+    for (const Node& a : assertionsToPreprocess->ref())
+    {
+        collectTypes(a, types, visited, mark);
+    }
+    std::map<TypeNode, TypeNode> normalizedSorts;
+    int sortCounter = 1;
+    for (const TypeNode& ctn : types)
+    {
+        if (ctn.isUninterpretedSort() && ctn.getNumChildren() == 0)
+        {
+            std::string new_sort_name = "S" + std::string(8 - numDigits(sortCounter), '0') + std::to_string(sortCounter++);
+            TypeNode new_sort = NodeManager::currentNM()->mkSort(new_sort_name);
+            normalizedSorts[ctn] = new_sort;
+            // std::cout << "Uninterpreted Sort: " << ctn << std::endl;
+        }
+    }
+    
 
     //////////////////////////////////////////////////////////////////////
     // Step 5: Normalize the nodes based on the sorted order
@@ -659,7 +732,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         for (const auto& ni : eqClass)
         {            
-            Node renamed = rename(ni->node, freeVar2node, boundVar2node, normalizedName, nodeManager, d_preprocContext);  
+            Node renamed = rename(ni->node, freeVar2node, boundVar2node, normalizedName, normalizedSorts, nodeManager, d_preprocContext);  
             ni->node = renamed;          
         }
     }
@@ -734,9 +807,35 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
     
     
-    // std::cout << "FINISHED DANESHVAR PASS" << std::endl; // Note to make sure not timing out on passg
 
     
+
+
+
+    // std::unordered_set<TypeNode> unorderedTypes;
+    // std::unordered_set<TNode> typeVisited;
+    // std::cout << "INSIDE DANESHVAR PASS" << std::endl;
+    // for (const Node& a : assertionsToPreprocess->ref())
+    // {
+    //     expr::getTypes(a, unorderedTypes, typeVisited);
+    // }
+    // std::cout << "Unoerdered types: " << std::endl;
+    // for (const TypeNode& a : unorderedTypes)
+    // {
+    //     std::cout << a << std::endl;
+    // }
+
+    // for (const TypeNode& ctn : unorderedTypes)
+    // {
+    //     if (ctn.isUninterpretedSort() && ctn.getNumChildren() == 0)
+    //     {
+    //         std::cout << "Uninterpreted Sort: " << ctn << std::endl;
+    //     }
+    // }
+
+    // std::cout << "FINISHED DANESHVAR PASS" << std::endl;
+
+
 
   return PreprocessingPassResult::NO_CONFLICT;
   
