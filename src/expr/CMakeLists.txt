@@ -113,6 +113,8 @@ libcvc5_add_sources(
   sygus_term_enumerator.h
   variadic_trie.cpp
   variadic_trie.h
+  normalize_sort_converter.cpp
+  normalize_sort_converter.h
 )
 
 libcvc5_add_sources(GENERATED

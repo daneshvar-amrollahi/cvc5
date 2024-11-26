@@ -27,6 +27,7 @@
 #include "util/statistics_registry.h"
 #include "preprocessing/preprocessing_pass_context.h" 
 #include "expr/cardinality_constraint.h"
+#include "expr/normalize_sort_converter.h"
 
 #include <map>
 #include <unordered_map>
@@ -269,7 +270,8 @@ Node rename(
     std::unordered_map<std::string, std::string>& normalizedName,
     std::map<TypeNode, TypeNode> normalizedSorts,
     NodeManager* nodeManager,
-    PreprocessingPassContext* d_preprocContext)
+    PreprocessingPassContext* d_preprocContext,
+    NormalizeSortNodeConverter* sortNormalizer)
 {
     // Map to cache normalized nodes
     std::unordered_map<Node, Node> normalized;
@@ -314,7 +316,12 @@ Node rename(
                             std::string new_var_name =
                                 "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                             // Node ret = nodeManager->mkBoundVar(new_var_name, current.getType());
-                            Node ret = nodeManager->mkBoundVar(new_var_name, normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType());
+                            // Node ret = nodeManager->mkBoundVar(new_var_name, 
+                                // normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType()
+                            // );
+                            Node ret = nodeManager->mkBoundVar(new_var_name, 
+                                sortNormalizer->convertType(current.getType())
+                            );
 
                             boundVar2node[current] = ret;
                             normalized[current] = ret;
@@ -338,7 +345,13 @@ Node rename(
                                 "v" + std::string(8 - numDigits(id), '0') + std::to_string(id);
                             cnodes.push_back(nodeManager->mkConst(String(new_var_name, false)));
                             // Node gt = nodeManager->mkConst(SortToTerm(current.getType()));
-                            Node gt = nodeManager->mkConst(SortToTerm(normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType()));
+                            // Node gt = nodeManager->mkConst(SortToTerm(
+                            //     normalizedSorts.find(current.getType()) != normalizedSorts.end() ? normalizedSorts[current.getType()] : current.getType())
+                            // );
+                            Node gt = nodeManager->mkConst(SortToTerm(
+                                sortNormalizer->convertType(current.getType())
+                            ));
+
                             cnodes.push_back(gt);
                             Node ret = nodeManager->getSkolemManager()->mkSkolemFunction(
                                 SkolemFunId::INPUT_VARIABLE, cnodes);
@@ -705,15 +718,18 @@ PreprocessingPassResult Daneshvar::applyInternal(
     std::unordered_set<TypeNode> mark;
     for (const Node& a : assertionsToPreprocess->ref())
     {
+        // std::cout << "Collecting types for " << a << std::endl;
         collectTypes(a, types, visited, mark);
+        // std::cout << std::endl;
     }
     std::map<TypeNode, TypeNode> normalizedSorts;
-    int sortCounter = 1;
+    int sortCounter = 0;
     for (const TypeNode& ctn : types)
     {
         if (ctn.isUninterpretedSort() && ctn.getNumChildren() == 0)
         {
-            std::string new_sort_name = "S" + std::string(8 - numDigits(sortCounter), '0') + std::to_string(sortCounter++);
+            std::string new_sort_name = "S" + std::string(8 - numDigits(sortCounter), '0') + std::to_string(sortCounter);
+            sortCounter++;
             TypeNode new_sort = NodeManager::currentNM()->mkSort(new_sort_name);
             normalizedSorts[ctn] = new_sort;
             // std::cout << "Uninterpreted Sort: " << ctn << std::endl;
@@ -721,6 +737,8 @@ PreprocessingPassResult Daneshvar::applyInternal(
     }
     
 
+    NormalizeSortNodeConverter* sortNormalizer = new NormalizeSortNodeConverter(normalizedSorts);
+    
     //////////////////////////////////////////////////////////////////////
     // Step 5: Normalize the nodes based on the sorted order
     std::unordered_map<Node, Node> freeVar2node;
@@ -732,7 +750,7 @@ PreprocessingPassResult Daneshvar::applyInternal(
     {
         for (const auto& ni : eqClass)
         {            
-            Node renamed = rename(ni->node, freeVar2node, boundVar2node, normalizedName, normalizedSorts, nodeManager, d_preprocContext);  
+            Node renamed = rename(ni->node, freeVar2node, boundVar2node, normalizedName, normalizedSorts, nodeManager, d_preprocContext, sortNormalizer);  
             ni->node = renamed;          
         }
     }

@@ -43,10 +43,10 @@ void PrintBenchmark::printDeclarationsFrom(std::ostream& outDecl,
 {
   std::unordered_set<TypeNode> unorderedTypes;
   std::unordered_set<TNode> typeVisited;
-  for (const Node& a : defs)
-  {
-    expr::getTypes(a, unorderedTypes, typeVisited);
-  }
+  // for (const Node& a : defs)
+  // {
+  //   expr::getTypes(a, unorderedTypes, typeVisited);
+  // }
   for (const Node& a : terms)
   {
     expr::getTypes(a, unorderedTypes, typeVisited);
