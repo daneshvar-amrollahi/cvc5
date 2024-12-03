@@ -487,9 +487,13 @@ void ProcessAssertions::dumpAssertionsToStream(std::ostream& os,
   std::vector<Node> defs;
   const theory::SubstitutionMap& sm = d_env.getTopLevelSubstitutions().get();
   const std::unordered_map<Node, Node>& ss = sm.getSubstitutions();
-  for (const std::pair<const Node, Node>& s : ss)
+
+  if (options().smt.printDefs)
   {
-    defs.push_back(s.first.eqNode(s.second));
+    for (const std::pair<const Node, Node>& s : ss)
+    {
+      defs.push_back(s.first.eqNode(s.second));
+    }
   }
   for (size_t i = 0, size = ap.size(); i < size; i++)
   {

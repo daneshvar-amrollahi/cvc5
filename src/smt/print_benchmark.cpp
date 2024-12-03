@@ -43,10 +43,10 @@ void PrintBenchmark::printDeclarationsFrom(std::ostream& outDecl,
 {
   std::unordered_set<TypeNode> unorderedTypes;
   std::unordered_set<TNode> typeVisited;
-  // for (const Node& a : defs)
-  // {
-  //   expr::getTypes(a, unorderedTypes, typeVisited);
-  // }
+  for (const Node& a : defs)
+  {
+    expr::getTypes(a, unorderedTypes, typeVisited);
+  }
   for (const Node& a : terms)
   {
     expr::getTypes(a, unorderedTypes, typeVisited);
@@ -123,7 +123,7 @@ void PrintBenchmark::printDeclarationsFrom(std::ostream& outDecl,
   std::unordered_set<Node> alreadyPrintedDef;
 
   std::unordered_map<Node, std::pair<bool, Node>>::const_iterator itd;
-  /*
+  
   for (const Node& s : defSyms)
   {
     std::vector<Node> recDefs;
@@ -184,7 +184,7 @@ void PrintBenchmark::printDeclarationsFrom(std::ostream& outDecl,
       outDef << std::endl;
     }
   }
-  */
+  
 
   // print the remaining declared symbols
   std::unordered_set<Node> unorderedSyms;
