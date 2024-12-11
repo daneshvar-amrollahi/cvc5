@@ -564,126 +564,126 @@ PreprocessingPassResult Daneshvar::applyInternal(
     
     /////////////////////////////////////////////////////////////
     // Step 4: Sort within equivalence classes
-    std::cout << "Sorting within equivalence classes" << std::endl;
-    std::map<std::string, std::vector<int32_t>> pattern; // Cache of patterns
 
-    for (auto& eqClass : eqClasses) {
-        std::sort(eqClass.begin(), eqClass.end(),
-            [&eqClasses, &pattern](NodeInfo* a, NodeInfo* b) {
-                // Since all nodes in eqClass have the same encoding, we don't need to compare 'encoding'
-
-                // std::cout << "Comparing" << std::endl;
-                // std::cout << "Node A: " << a->node << std::endl;
-                // std::cout << "Node B: " << b->node << std::endl;
-
-                // Iterate over varNames in parallel
-                auto itA = a->varNames.begin();
-                auto itB = b->varNames.begin();
-
-                while (itA != a->varNames.end() && itB != b->varNames.end()) {
-                    const std::string& symbolA = itA->first; // varNames stores pairs, first is the symbol
-                    const std::string& symbolB = itB->first; // varNames stores pairs, first is the symbol
-
-                    // Compute or retrieve patterns only once for each symbol
-                    auto getOrComputePattern = [&](const std::string& symbol) -> const std::vector<int32_t>& {
-                        auto it = pattern.find(symbol);
-                        if (it != pattern.end()) {
-                            return it->second;
-                        }
-
-                        std::vector<int32_t> pat;
-                        uint32_t ecId = 0;
-
-                        for (const auto& eqClassInner : eqClasses) {
-                            ecId++;
-                            std::vector<int32_t> roles;
-                            // roles.push_back(ecId);
-                            // roles.push_back(-999);
-                            bool found = false;
-
-                            std::map<int32_t, uint32_t> roleCounter;
-
-                            for (const NodeInfo* ni : eqClassInner) {
-                                auto roleIt = ni->role.find(symbol);
-                                // roles.push_back(roleIt != ni->role.end() ? roleIt->second : static_cast<int32_t>(-1));
-                                // std::sort(roles.begin(), roles.end());
-                                // pat.insert(pat.end(), roles.begin(), roles.end());
-                                if (roleIt != ni->role.end()) {
-                                    // roles.push_back(roleIt->second);
-                                    roleCounter[roleIt->second]++;
-                                    found = true;
-                                }
-                                else
-                                {
-                                    // roles.push_back(-1);
-                                    roleCounter[-1]++;
-                                }
-                            }
+    std::chrono::duration<double> total_pattern_computation_time(0); // Time computing new pattern hashes
+std::chrono::duration<double> total_pattern_comparison_time(0);  // Time spent in hash comparisons only
 
 
-                            if (found) {
-                                pat.push_back(ecId);
-                                for (const auto& [role, count] : roleCounter)
-                                {
-                                    pat.push_back(role);
-                                    pat.push_back(-count);
-                                }
+size_t pattern_hash_computation_count = 0; // How many times we compute a new pattern hash
+size_t pattern_hash_comparison_count = 0;  // How many times we compare two pattern hashes
 
-                                // std::sort(roles.begin() + 2, roles.end());
-                                // pat.insert(pat.end(), roles.begin(), roles.end());
-                            }
-                            
-                        }
+std::map<std::string, int64_t> patternHash; // Cache of pattern hashes (sum of pattern elements)
 
-                        // Cache the computed pattern
-                        pattern[symbol] = std::move(pat);
-                        return pattern[symbol];
-                    };
+for (auto& eqClass : eqClasses) {
+    std::sort(eqClass.begin(), eqClass.end(),
+        [&](NodeInfo* a, NodeInfo* b) {
+            auto itA = a->varNames.begin();
+            auto itB = b->varNames.begin();
 
-                    // Retrieve patterns for both symbols
-                    const std::vector<int32_t>& pat_a = getOrComputePattern(symbolA);
-                    const std::vector<int32_t>& pat_b = getOrComputePattern(symbolB);
+            while (itA != a->varNames.end() && itB != b->varNames.end()) {
+                const std::string& symbolA = itA->first; 
+                const std::string& symbolB = itB->first;
 
-                    /*
-                    std::cout << "pattern for " << symbolA << " : ";
-                    for (const auto& p : pat_a) {
-                        if (p == -999)
-                            std::cout << " ||||| ";
-                        else
-                            std::cout << p << " , ";
+                // Compute or retrieve pattern hash for each symbol
+                auto getOrComputePatternHash = [&](const std::string& symbol) -> int64_t {
+                    auto it = patternHash.find(symbol);
+                    if (it != patternHash.end()) {
+                        return it->second;
                     }
-                    */
-                    // std::cout << std::endl;
-                    // std::cout << "pattern for " << symbolB << " : ";
-                    // for (const auto& p : pat_b) {
-                    //     std::cout << p << " , ";
-                    // }
-                    // std::cout << std::endl << "--------" << std::endl;
 
-                    // Compare patterns
-                    size_t minPatSize = std::min(pat_a.size(), pat_b.size());
-                    for (size_t j = 0; j < minPatSize; ++j) {
-                        if (pat_a[j] != pat_b[j]) {
-                            // std::cout << "Distinguished!" << std::endl << std::endl;
-                            return pat_a[j] < pat_b[j];
+                    // Start timing pattern computation
+                    auto pattern_start = std::chrono::steady_clock::now();
+
+                    pattern_hash_computation_count++; // We are computing a new pattern hash
+
+                    int64_t sum = 0;
+                    uint32_t ecId = 0;
+
+                    // Compute the pattern hash
+                    for (const auto& eqClassInner : eqClasses) {
+                        ecId++;
+                        std::map<int32_t, uint32_t> roleCounter;
+                        bool found = false;
+
+                        for (const NodeInfo* ni : eqClassInner) {
+                            auto roleIt = ni->role.find(symbol);
+                            if (roleIt != ni->role.end()) {
+                                roleCounter[roleIt->second]++;
+                                found = true;
+                            } else {
+                                roleCounter[-1]++;
+                            }
+                        }
+
+                        if (found) {
+                            sum += ecId;
+                            for (const auto& [role, count] : roleCounter) {
+                                sum += role;
+                                sum += (-static_cast<int64_t>(count));
+                            }
                         }
                     }
 
-                    ++itA;
-                    ++itB;
+                    // Cache the computed pattern hash
+                    patternHash[symbol] = sum;
+
+                    // End timing pattern computation
+                    auto pattern_end = std::chrono::steady_clock::now();
+                    total_pattern_computation_time += (pattern_end - pattern_start);
+
+                    return sum;
+                };
+
+                int64_t hashA = getOrComputePatternHash(symbolA);
+                int64_t hashB = getOrComputePatternHash(symbolB);
+
+                // Now measure only the time it takes to check hashA != hashB
+                {
+                    auto single_comparison_start = std::chrono::steady_clock::now();
+                    pattern_hash_comparison_count++;
+                    bool diff = (hashA != hashB);
+                    auto single_comparison_end = std::chrono::steady_clock::now();
+                    total_pattern_comparison_time += (single_comparison_end - single_comparison_start);
+
+                    if (diff) {
+                        return hashA < hashB;
+                    }
                 }
 
-                // Handle cases where one iterator reaches the end before the other
-                if (itA != a->varNames.end()) return true;
-                if (itB != b->varNames.end()) return false;
+                ++itA;
+                ++itB;
+            }
 
-                // std::cout << "Not Distinguished!" << std::endl << std::endl;
-
+            // Handle cases where one iterator reaches the end before the other
+            if (itA != a->varNames.end()) {
+                return true;
+            }
+            if (itB != b->varNames.end()) {
                 return false;
-            });
-    }
+            }
 
-    std::cout << "Finished sorting within equivalence classes" << std::endl;
+            return false;
+        });
+}
+
+// After all sorting is done, print the accumulated times and counts
+std::cout << "Total time taken to compute new pattern hashes: "
+          << total_pattern_computation_time.count() << " seconds" << std::endl;
+
+std::cout << "Total time taken to compare pattern hashes (just the hashA != hashB check): "
+          << total_pattern_comparison_time.count() << " seconds" << std::endl;
+
+std::cout << "Number of times a new pattern hash was computed: "
+          << pattern_hash_computation_count << std::endl;
+
+std::cout << "Number of times a pair of pattern hashes was compared: "
+          << pattern_hash_comparison_count << std::endl;
+
+
+
+
+
+
 
 
     //////////////////////////////////////////////////////////////////////
