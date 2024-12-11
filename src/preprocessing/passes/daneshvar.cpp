@@ -398,9 +398,15 @@ Node rename(
                             int id = globalVarCounter++;
                             std::string new_var_name =
                                 "u" + std::string(8 - numDigits(id), '0') + std::to_string(id);
-                            Node newBv = nodeManager->mkBoundVar(new_var_name, bv.getType());
-                            boundVar2node[bv] = newBv;
-                            normalized[bv] = newBv;
+                            // Node newBv = nodeManager->mkBoundVar(new_var_name, bv.getType());
+                            // boundVar2node[bv] = newBv;
+                            // normalized[bv] = newBv;
+
+                            Node ret = nodeManager->mkBoundVar(new_var_name, 
+                                sortNormalizer->convertType(bv.getType())
+                            );
+                            boundVar2node[bv] = ret;
+                            normalized[bv] = ret;
                         }
                         normalizedBoundVars.push_back(normalized[bv]);
                     }
