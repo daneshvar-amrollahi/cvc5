@@ -31,7 +31,8 @@ class NormalizeSortNodeConverter : public NodeConverter
    * Constructor
    * @param normalizedSorts A map that defines how types should be normalized.
    */
-  NormalizeSortNodeConverter(const std::map<TypeNode, TypeNode>& normalizedSorts);
+  NormalizeSortNodeConverter(const std::map<TypeNode, TypeNode>& normalizedSorts,
+                           NodeManager* nm);
 
   /** Destructor */
   ~NormalizeSortNodeConverter() override {}
