@@ -6,8 +6,9 @@
 
 namespace cvc5::internal {
 
-NormalizeSortNodeConverter::NormalizeSortNodeConverter(const std::map<TypeNode, TypeNode>& normalizedSorts)
-    : NodeConverter(), d_normalizedSorts(normalizedSorts)
+NormalizeSortNodeConverter::NormalizeSortNodeConverter(
+    const std::map<TypeNode, TypeNode>& normalizedSorts, NodeManager* nm)
+    : NodeConverter(nm), d_normalizedSorts(normalizedSorts)
 {
 }
 
