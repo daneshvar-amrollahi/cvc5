@@ -274,6 +274,13 @@ name   = "Base"
   name = "rare-db"
   help = "upon initialization, print the entire set of RARE rewrite rules as they are defined in the proof signature."
   description = "With ``-o rare-db``, upon initialization, cvc5 prints the entire set of RARE rewrite rules as they are defined in the proof signature."
+[[option.mode.NORMALIZE]]
+  name = "normalize"
+  help = "prints the benchmark after normalization"
+  description = "With ``-o normalize``, cvc5 prints the benchmark after normalization."
+  example-file = "regress0/printer/normalize.smt2"
+
+  
 
 # Stores then enabled output tags.
 [[option]]
