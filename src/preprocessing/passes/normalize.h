@@ -29,10 +29,11 @@ namespace passes {
 struct NodeInfo
 {
   Node node;
-  std::string encoding;  
-  uint32_t equivClass;        
-  std::map<std::string, int32_t> role; // First occurence index (counter) of each symbol when traversing the DAG
-  std::vector<std::pair<std::string, int32_t>> varNames;
+  std::string encoding;                                   // Compressed string of the DAG
+  uint32_t equivClass;                                    // Equivalence class ID
+  std::map<std::string, int32_t> role;                    // First occurence index (counter) of each symbol when traversing the DAG
+  std::vector<std::pair<std::string, int32_t>> varNames;  
+  uint32_t id;                                            // Index of the assertion after first round of sorting
 
   NodeInfo() {}
 
@@ -60,6 +61,8 @@ struct NodeInfo
     }
     std::cout << std::endl;
   }
+
+  void setId(uint32_t i) { id = i; }
 };
 
 
