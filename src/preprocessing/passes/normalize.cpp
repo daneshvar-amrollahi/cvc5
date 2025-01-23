@@ -632,6 +632,11 @@ PreprocessingPassResult Normalize::applyInternal(
             return a[0]->encoding > b[0]->encoding;
         });
 
+
+
+    /*
+
+
     // Set IDs for all nodes. Used for super-pattern computation
     uint32_t idCnt = 0;
     for (const auto& eqClass : eqClasses)
@@ -783,6 +788,8 @@ PreprocessingPassResult Normalize::applyInternal(
                 return false;
             });
     }
+
+    */
 
 
     std::vector<TypeNode> types;
