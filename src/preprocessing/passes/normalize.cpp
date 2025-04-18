@@ -889,6 +889,8 @@ PreprocessingPassResult Normalize::applyInternal(
     // Step 4: Sort within equivalence classes
     auto startStep4 = std::chrono::high_resolution_clock::now();
     
+    /*
+
     std::unordered_map<std::string, std::vector<std::vector<int32_t>>> patternCache; // Cache of superpatterns
 
 
@@ -984,6 +986,7 @@ PreprocessingPassResult Normalize::applyInternal(
             });
     }
     
+    */
     auto endStep4 = std::chrono::high_resolution_clock::now();
     auto durationStep4 = std::chrono::duration_cast<std::chrono::milliseconds>(endStep4 - startStep4).count();
 
