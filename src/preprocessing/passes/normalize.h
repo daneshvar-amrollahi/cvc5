@@ -19,6 +19,7 @@
 #define CVC5__PREPROCESSING__PASSES__NORMALIZE_H
 
 #include "preprocessing/preprocessing_pass.h"
+#include <unordered_map>
 
 namespace cvc5::internal {
 namespace preprocessing {
@@ -31,7 +32,7 @@ struct NodeInfo
   Node node;
   std::string encoding;                                   // Compressed string of the DAG
   uint32_t equivClass;                                    // Equivalence class ID
-  std::map<std::string, int32_t> role;                    // First occurence index (counter) of each symbol when traversing the DAG
+  std::unordered_map<std::string, int32_t> role;          // First occurence index (counter) of each symbol when traversing the DAG. 
   std::vector<std::pair<std::string, int32_t>> varNames;  
   uint32_t id;                                            // Index of the assertion after first round of sorting
 
@@ -41,7 +42,7 @@ struct NodeInfo
     const Node& n, 
     const std::string& enc, 
     uint32_t eqClass,
-    const std::map<std::string, int32_t>& r,
+    const std::unordered_map<std::string, int32_t>& r,
     const std::vector<std::pair<std::string, int32_t>>& vn
   ) : node(n), encoding(enc), equivClass(eqClass), role(r), varNames(vn) {}
 
