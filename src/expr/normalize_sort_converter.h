@@ -10,14 +10,14 @@
  * directory for licensing information.
  * ****************************************************************************
  *
- * Implementation of beta reduction node conversion
+ *
  */
-#ifndef CVC4__EXPR__NORMALIZE_SORT_NODE_CONVERTER_H
-#define CVC4__EXPR__NORMALIZE_SORT_NODE_CONVERTER_H
+#ifndef CVC5__EXPR__NORMALIZE_SORT_NODE_CONVERTER_H
+#define CVC5__EXPR__NORMALIZE_SORT_NODE_CONVERTER_H
 
 #include "cvc5_private.h"
 #include "expr/node_converter.h"
-#include <map>
+#include <unordered_map>
 
 namespace cvc5::internal {
 
@@ -31,7 +31,7 @@ class NormalizeSortNodeConverter : public NodeConverter
    * Constructor
    * @param normalizedSorts A map that defines how types should be normalized.
    */
-  NormalizeSortNodeConverter(const std::map<TypeNode, TypeNode>& normalizedSorts,
+  NormalizeSortNodeConverter(const std::unordered_map<TypeNode, TypeNode>& normalizedSorts,
                            NodeManager* nm);
 
   /** Destructor */
@@ -47,7 +47,7 @@ class NormalizeSortNodeConverter : public NodeConverter
 
  private:
   /** Map storing the normalized sorts */
-  std::map<TypeNode, TypeNode> d_normalizedSorts;
+  std::unordered_map<TypeNode, TypeNode> d_normalizedSorts;
 };
 
 }  // namespace cvc5::internal
