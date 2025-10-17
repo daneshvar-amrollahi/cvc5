@@ -10,7 +10,7 @@
  * directory for licensing information.
  * ****************************************************************************
  *
- * ToDo: write description
+ * 
  */
 
 #include "cvc5_private.h"
@@ -48,13 +48,13 @@ struct NodeInfo
   void print() const {
     std::cout << "Node : " << node << std::endl;
     std::cout << "Encoding: " << encoding << std::endl;
-    std::cout << "Role: ";
+    std::cout << "Roles: ";
     for (const auto& [symbol, idx] : role)
     {
         std::cout << symbol << " : " << idx << " , ";
     }
     std::cout << std::endl;
-    std::cout << "VarNames: ";
+    std::cout << "Symbols: ";
     for (const auto& [symbol, idx] : varNames)
     {
         std::cout << symbol << " : " << idx << " , ";
